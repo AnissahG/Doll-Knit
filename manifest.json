@@ -1,0 +1,16 @@
+{
+  "name": "Doll knit Pattern Studio",
+  "short_name": "Doll knit",
+  "description": "Graded knitting patterns for BJD dolls — dolls, gauges, garment builder, and pattern grading, all offline.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EBE3CF",
+  "theme_color": "#7B2D3A",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

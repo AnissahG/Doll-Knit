@@ -1,0 +1,28 @@
+{
+  "name": "doll-knit-pattern-studio",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Graded knitting patterns for BJD dolls — dolls, gauges, garment builder and pattern grading, all offline.",
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs",
+    "serve": "node scripts/serve.mjs",
+    "android:prepare": "npm run vendor && npx cap add android && npx capacitor-assets generate --android && npx cap sync android",
+    "test": "node tests/app.test.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.4",
+    "@capacitor/share": "^8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
+    "@fontsource/fraunces": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.2.5",
+    "fake-indexeddb": "^6.2.6",
+    "jsdom": "^26.1.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "appId": "com.dollheimr.knitstudio",
+  "appName": "Doll knit",
+  "webDir": "www",
+  "backgroundColor": "#EBE3CF",
+  "android": {
+    "backgroundColor": "#EBE3CF"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "LIGHT",
+      "insetsHandling": "css"
+    }
+  }
+}

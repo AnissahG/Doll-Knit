@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Doll knit Pattern Studio</title>
+<meta name="description" content="Graded knitting patterns for BJD dolls — dolls, gauges, garment builder and pattern grading, all offline.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7B2D3A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Doll knit">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="masthead">
+    <img src="icons/logo.png" alt="">
+    <div class="titles">
+      <h1>Doll knit Pattern Studio</h1>
+      <p>Doll measurements, gauge library and instant graded patterns for hand and machine knitting.</p>
+    </div>
+    <button class="icon-btn" id="settingsBtn" aria-label="Backup and settings" title="Backup and settings" onclick="openSettings()">⚙</button>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="dolls">Dolls</button>
+    <button class="tab" data-tab="gauges">Gauge & Yarn</button>
+    <button class="tab" data-tab="builder">Build Pattern</button>
+    <button class="tab" data-tab="saved">Saved</button>
+    <button class="tab" data-tab="customgrade">Custom Grade</button>
+  </div>
+
+  <!-- DOLLS (rendered by js/dolls.js) -->
+  <div class="panel active" id="panel-dolls"></div>
+
+  <!-- GAUGES -->
+  <div class="panel" id="panel-gauges">
+    <div class="card">
+      <h3 id="gaugeFormTitle">Add a gauge / project setup</h3>
+      <div class="field"><label>Label</label><input id="g_name" placeholder="e.g. Sock-weight stocking stitch, MSD"></div>
+      <div class="field"><label>Method</label>
+        <select id="g_method" onchange="toggleGaugeToolLabel()">
+          <option value="hand">Hand knitting</option>
+          <option value="machine">Machine knitting</option>
+        </select>
+      </div>
+      <div class="field"><label>Yarn</label><input id="g_yarn" placeholder="e.g. Habu sock weight, natural"></div>
+      <div class="field"><label id="g_toolLabel">Needle size</label><input id="g_tool" placeholder="e.g. 2mm  /  Tension 6, standard bed"></div>
+      <div class="field" id="g_tensionField" style="display:none;"><label>Stockinette tension <span class="hint">(the tension dial number this gauge's sts/rows-per-10cm were actually swatched at — used to build tension-step collar bands for this yarn specifically)</span></label><input id="g_tension" type="number" step="0.1" placeholder="e.g. 6.5"></div>
+      <div class="row2">
+        <div class="field"><label>Stitches per 10cm</label><input id="g_sts" type="number" step="0.1"></div>
+        <div class="field"><label>Rows per 10cm</label><input id="g_rows" type="number" step="0.1"></div>
+      </div>
+      <div class="field"><label>Yarn used for a 10x10cm swatch <span class="hint">(meters, optional — enables a yardage estimate)</span></label><input id="g_yardage" type="number" step="0.1"></div>
+      <div class="field"><label>Notes</label><input id="g_notes" placeholder="optional"></div>
+      <div class="btn-row">
+        <button class="btn" onclick="saveGauge()">Save gauge</button>
+        <button class="btn secondary" onclick="clearGaugeForm()" id="gaugeCancelBtn" style="display:none;">Cancel edit</button>
+      </div>
+    </div>
+    <h3 style="margin:16px 0 8px;">Your gauges</h3>
+    <ul class="entry-list" id="gaugeList"></ul>
+  </div>
+
+  <!-- BUILDER -->
+  <div class="panel" id="panel-builder">
+    <div class="card">
+      <h3>Design the garment</h3>
+      <div class="field"><label>Doll</label><select id="b_doll" onchange="onDollOrModeChange()"></select></div>
+      <div class="field"><label>Gauge</label><select id="b_gauge"></select></div>
+
+      <div class="field"><label>Garment</label>
+        <select id="b_garment" onchange="toggleGarmentFields()">
+          <option value="pullover">Pullover</option>
+          <option value="cardigan">Cardigan</option>
+          <option value="vest">Vest / sleeveless top</option>
+          <option value="bolero">Bolero / shrug</option>
+          <option value="poncho">Poncho / cape</option>
+          <option value="bodysuit">Bodysuit / leotard</option>
+          <option value="jumpsuit">Jumpsuit / romper</option>
+          <option value="bra">Bra / bralette</option>
+          <option value="dress">Dress</option>
+          <option value="pants">Pants / shorts</option>
+          <option value="skirt">Skirt</option>
+          <option value="hat">Hat</option>
+          <option value="socks">Socks</option>
+          <option value="legwarmers">Leg warmers</option>
+          <option value="armwarmers">Arm warmers</option>
+          <option value="scarf">Scarf / cowl / snood</option>
+        </select>
+      </div>
+      <div class="sub-fields" id="cardiganFields">
+        <div class="field"><label>Front style / closure</label>
+          <select id="b_cardiganClosure" onchange="toggleCardiganFields()">
+            <option value="buttoned">Buttoned</option>
+            <option value="open">Open front (no closure)</option>
+            <option value="zippered">Zippered</option>
+            <option value="wraptie">Wrap / tie</option>
+            <option value="doublebreasted">Double-breasted</option>
+          </select>
+        </div>
+        <div class="field" id="buttonCountField"><label>Button count</label><input id="b_buttons" type="number" value="5" min="1"></div>
+        <div class="field"><label>Front edge shape <span class="hint">(optional)</span></label>
+          <select id="b_cardiganFrontShape">
+            <option value="straight">Straight front</option>
+            <option value="vfront">V-front (angles open toward the hem)</option>
+            <option value="rounded">Rounded front (curved lower corner)</option>
+          </select>
+        </div>
+        <div class="field" id="cardiganBandStyleField"><label>Front &amp; neck band</label>
+          <select id="b_cardiganBandStyle" onchange="toggleCardiganFields()">
+            <option value="separate">Separate (band knit into each front; neckband picked up on its own)</option>
+            <option value="continuous">Continuous — one band, hem to hem around the back neck</option>
+          </select>
+        </div>
+        <div class="field" id="cardiganOverlapField"><label><input type="checkbox" id="b_cardiganOverlap" style="width:auto;margin-right:6px;">Bands overlap when closed</label>
+          <p class="help" style="margin:2px 0 0;">Checked: a real overlap — the buttonhole side sits on top of the plain side (or, for a continuous band, the band is worked extra-wide at the fronts so it crosses at center front, like a wrap or shawl collar). Unchecked: the two edges just meet, no overlap.</p>
+        </div>
+      </div>
+      <div class="sub-fields" id="dressFields">
+        <div class="field"><label>Hip circumference override <span class="hint">(cm, optional — defaults from doll's hip if blank)</span></label><input id="b_hip" type="number" step="0.1"></div>
+      </div>
+
+      <!-- HAT-ONLY FIELDS -->
+      <div class="drawer" id="hatFields">
+        <div class="field"><label>Body style</label>
+          <select id="b_hatStyle" onchange="toggleHatFields()">
+            <option value="beanie">Beanie (fitted, classic)</option>
+            <option value="slouchy">Slouchy — comfort slouch (extra width + length)</option>
+            <option value="beret">Beret (fuller body, ~50% wider than the brim)</option>
+            <option value="earflap">Earflap</option>
+          </select>
+        </div>
+        <div class="field"><label>Construction</label>
+          <select id="b_hatConstruction">
+            <option value="round">In the round (seamless)</option>
+            <option value="flat">Flat (worked back and forth, seamed)</option>
+          </select>
+        </div>
+        <div class="field"><label>Brim style</label>
+          <select id="b_hatBrim">
+            <option value="ribbed">Ribbed (standard)</option>
+            <option value="folded">Folded / doubled (seamless, moderate warmth)</option>
+            <option value="watchcap">Watch cap (deep chunky fold-up cuff, vintage)</option>
+            <option value="peaked">Peaked / billed (projecting brim, front only)</option>
+          </select>
+        </div>
+        <div class="field"><label>Crown style</label>
+          <select id="b_hatCrown" onchange="toggleHatFields()">
+            <option value="gathered">Gathered (standard)</option>
+            <option value="pointed">Pointed (pixie / stocking cap)</option>
+            <option value="flatround">Flat & round (beret-style disc)</option>
+          </select>
+        </div>
+        <div class="sub-fields" id="hatPointFields">
+          <div class="field"><label>Point length</label>
+            <select id="b_hatPointLength">
+              <option value="soft">Soft & short (pixie)</option>
+              <option value="long">Long & tapering (stocking cap)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Hat height override <span class="hint">(cm, crown to brim edge — optional, defaults from head height/circumference and style if blank)</span></label><input id="b_hatHeight" type="number" step="0.1"></div>
+        <div class="field"><label><input type="checkbox" id="b_pompom" style="width:auto;margin-right:6px;">Add a pom-pom</label></div>
+      </div>
+
+      <!-- SOCKS-ONLY FIELDS -->
+      <div class="drawer" id="sockFields">
+        <div class="field"><label>Sock height</label>
+          <select id="b_sockHeight" onchange="refreshSockLegHeightDefault()">
+            <option value="ankle">Ankle</option>
+            <option value="crew">Crew (mid-calf)</option>
+            <option value="knee">Knee-high</option>
+            <option value="thigh">Thigh-high</option>
+          </select>
+        </div>
+        <div class="field"><label>Leg length <span class="hint">(cm, top of cuff to ankle bone — auto-filled from the height above and this doll's leg landmarks, editable)</span></label><input id="b_sockLegHeight" type="number" step="0.1" placeholder="e.g. 3"></div>
+        <p class="help" style="margin-top:-4px;">Worked flat as two seamed strips (sole+heel, instep+toe) meeting a ribbed cuff/leg tube — no double-pointed needles or picked-up gusset stitches needed. Knee-high and thigh-high shape the leg out to the calf/thigh circumference (when those measurements are on file) instead of staying a straight ankle-width tube. The heel is a real short-row heel turn (narrows, then widens back out) right where the leg splits; the toe is a short-row wedge cap.</p>
+      </div>
+
+      <div class="drawer" id="warmerFields">
+        <div class="field"><label>Length <span class="hint">(cm, cuff to cuff — blank auto-fills from this doll's leg/arm landmarks)</span></label><input id="b_warmerLength" type="number" step="0.1"></div>
+        <p class="help" style="margin-top:-4px;">A simple shaped tube: rib cuff, gradual taper to the wider end, rib cuff at the other end. Leg warmers use thigh/calf and ankle circumference; arm warmers use upper-arm/elbow and wrist circumference.</p>
+      </div>
+
+      <div class="drawer" id="scarfFields">
+        <div class="field"><label>Style</label>
+          <select id="b_scarfStyle">
+            <option value="scarf">Scarf (flat, open ends)</option>
+            <option value="cowl">Cowl (joined tube, medium drop)</option>
+            <option value="snood">Snood (joined tube, deep, can be pulled up over the head)</option>
+          </select>
+        </div>
+        <div class="field" id="scarfLengthField"><label>Length <span class="hint">(cm)</span></label><input id="b_scarfLength" type="number" step="0.1" placeholder="e.g. 20"></div>
+        <div class="field"><label>Width / circumference <span class="hint">(cm — width for a scarf, circumference for a cowl/snood)</span></label><input id="b_scarfWidth" type="number" step="0.1" placeholder="e.g. 5"></div>
+      </div>
+
+      <div class="drawer" id="ponchoFields">
+        <div class="field"><label>Style</label>
+          <select id="b_ponchoStyle" onchange="togglePonchoFields()">
+            <option value="straight">Straight (rectangle-ish drop, seamed at shoulders)</option>
+            <option value="flared">Flared (circular flare, worked outward from the neck)</option>
+            <option value="hooded">Hooded (straight body + hood)</option>
+            <option value="splitfront">Split-front (open down the center front, like a cape)</option>
+            <option value="capelet">Capelet (short, shoulder-only length)</option>
+          </select>
+        </div>
+        <div class="field"><label>Length <span class="hint">(cm, neck to hem)</span></label><input id="b_ponchoLength" type="number" step="0.1" placeholder="e.g. 8"></div>
+        <div class="field" id="ponchoHoodHeightField"><label>Hood height override <span class="hint">(cm, optional)</span></label><input id="b_ponchoHoodHeight" type="number" step="0.1"></div>
+      </div>
+
+      <div class="drawer" id="bodysuitFields">
+        <div class="field"><label>Torso length override <span class="hint">(cm, underarm to crotch — blank auto-fills from this doll's hip and rise landmarks)</span></label><input id="b_bodysuitLength" type="number" step="0.1"></div>
+        <div class="field"><label>Closure</label>
+          <select id="b_bodysuitClosure">
+            <option value="pullon">Pull-on (no closure — relies on stretch)</option>
+            <option value="snapcrotch">Snap-crotch opening</option>
+          </select>
+        </div>
+        <p class="help" style="margin-top:-4px;">Uses the Silhouette / Construction / Neckline / Sleeve / Collar fields below like a pullover, worked fitted down to the crotch instead of hemming — finished there with picked-up rib leg-opening bands instead of a hem.</p>
+      </div>
+
+      <div class="drawer" id="jumpsuitFields">
+        <div class="field"><label>Leg style</label>
+          <select id="b_jumpsuitLegStyle">
+            <option value="straight">Straight leg</option>
+            <option value="skinny">Skinny / fitted leg</option>
+            <option value="wide">Wide leg</option>
+            <option value="shorts">Shorts (romper)</option>
+          </select>
+        </div>
+        <div class="field"><label>Bodice length override <span class="hint">(cm, underarm to natural waist — blank auto-fills)</span></label><input id="b_jumpsuitBodiceLength" type="number" step="0.1"></div>
+        <div class="field"><label>Leg length override <span class="hint">(cm, waist join to leg opening — blank auto-fills)</span></label><input id="b_jumpsuitLegLength" type="number" step="0.1"></div>
+        <p class="help" style="margin-top:-4px;">A fitted bodice (Silhouette / Construction / Neckline / Sleeve / Collar fields below, same as a pullover) joined at the natural waist to a pair of pants legs (Pockets fields below also apply).</p>
+      </div>
+
+      <div class="drawer" id="braFields">
+        <div class="field"><label>Style</label>
+          <select id="b_braStyle" onchange="toggleBraFields()">
+            <option value="triangle">Triangle bralette</option>
+            <option value="balconette">Balconette / cup bra</option>
+            <option value="bandeau">Bandeau</option>
+            <option value="longline">Longline bralette</option>
+            <option value="halter">Halter bra top</option>
+            <option value="tieback">Tie-back bra top</option>
+          </select>
+        </div>
+        <div class="field" id="braStrapField"><label>Strap type</label>
+          <select id="b_braStrap">
+            <option value="spaghetti">Spaghetti (i-cord/crochet chain)</option>
+            <option value="halter">Halter (both straps meet at center neck)</option>
+            <option value="wide">Wide (knit band)</option>
+            <option value="offshoulder">Off-shoulder</option>
+            <option value="strapless">Strapless</option>
+          </select>
+        </div>
+        <div class="field"><label>Cup shaping</label>
+          <select id="b_braCup">
+            <option value="gathered">Gathered (short rows draw in fullness)</option>
+            <option value="darted">Darted (paired short-row darts)</option>
+            <option value="flat">Flat (no shaping — soft/bralette style)</option>
+          </select>
+        </div>
+        <div class="field"><label>Coverage</label>
+          <select id="b_braCoverage">
+            <option value="medium">Medium</option>
+            <option value="minimal">Minimal</option>
+            <option value="full">Full</option>
+          </select>
+        </div>
+        <div class="field" id="braBandField"><label>Band finish</label>
+          <select id="b_braBand">
+            <option value="ribbed">Ribbed</option>
+            <option value="plain">Plain (stocking stitch)</option>
+            <option value="elastic">Elastic-look (channel + thread elastic)</option>
+          </select>
+        </div>
+        <div class="field" id="braClosureField"><label>Closure</label>
+          <select id="b_braClosure">
+            <option value="pullon">Pull-on (no closure)</option>
+            <option value="hookeye">Hook-and-eye look (back band)</option>
+            <option value="tieback">Tie-back</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- TOP-GARMENT ONLY FIELDS -->
+      <div class="drawer" id="topFields">
+        <div class="field"><label>Silhouette</label>
+          <select id="b_silhouette">
+            <option value="straight">Straight</option>
+            <option value="aline">A-line (flares out toward hem)</option>
+            <option value="tapered">Tapered (narrower at hem)</option>
+            <option value="shaped">Fitted / hourglass (nipped waist)</option>
+            <option value="peplum">Peplum (fitted body, sudden flounce at hem)</option>
+            <option value="cocoon">Cocoon / balloon (widens through torso, narrows at both ends)</option>
+            <option value="swing">Swing / trapeze (strong flare starting high, for tunics/oversized)</option>
+            <optgroup label="Dress only" id="dressSilOptgroup">
+              <option value="fitflare">Fit &amp; flare (fitted bodice/waist, distinctly flared skirt)</option>
+              <option value="empire">Empire / babydoll (fullness starts right under the bust)</option>
+              <option value="dropwaist">Drop-waist (fitted torso past the natural waist to low hip)</option>
+              <option value="mermaid">Mermaid / trumpet (fitted through hip/thigh, flares near the knee)</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="field"><label>Shoulder / armhole construction</label>
+          <select id="b_construction" onchange="handleConstructionChange()">
+            <option value="setin">Set-in sleeve</option>
+            <option value="raglan">Raglan</option>
+            <option value="saddle">Saddle shoulder</option>
+            <option value="square">Drop shoulder (square indented)</option>
+            <option value="dolman">Dolman / batwing (sleeve grown from body)</option>
+            <option value="kimono">Kimono (straight extended sleeve)</option>
+            <option value="circularyoke">Circular / yoke (worked top-down, in the round)</option>
+          </select>
+        </div>
+        <div class="field"><label>Neckline shape</label>
+          <select id="b_neck" onchange="updateCollarOptions()">
+            <option value="crew">Round / crew</option>
+            <option value="vneck">V-neck</option>
+            <option value="scoop">Scoop (wide, shallow)</option>
+            <option value="square">Square</option>
+            <option value="boat">Boat / bateau (shallow, very wide)</option>
+            <option value="placket">Placket (with vertical slit)</option>
+            <option value="slit">Slit neck</option>
+            <option value="offshoulder">Off-shoulder (wide, horizontal opening)</option>
+          </select>
+        </div>
+        <div class="field"><label>Front neck extra depth <span class="hint">(rows — for Round/Scoop/Square/Boat/Placket/Slit: beyond the back neck's own depth, default ≈ 1cm worth of rows at your gauge. For V-neck: rows LESS than the full armhole depth, default 0 = classic deep V to the underarm.)</span></label><input id="b_neckDepthOffset" type="number" step="1" placeholder="auto"></div>
+        <div class="field"><label>Collar / neckband finish</label>
+          <select id="b_collar" onchange="toggleCollarFields()"></select>
+          <p class="help" style="margin:4px 0 0;">Only finishes that fit this neckline (and garment) are listed.</p>
+        </div>
+        <div class="field"><label>Opening <span class="hint">(independent of the collar above — adds a front opening to an otherwise closed band; ignored for collars that already open at the front, like buttoned/zippered high neck, Henley, Johnny, camp, Peter Pan, shawl, or the V-neck trims)</span></label>
+          <select id="b_opening">
+            <option value="none">None (closed)</option>
+            <option value="zip">Center-front zip</option>
+            <option value="henley">Henley placket</option>
+            <option value="button">Button placket</option>
+          </select>
+        </div>
+        <div class="sub-fields" id="hoodFields">
+          <div class="field"><label>Hood height override <span class="hint">(cm, optional — defaults from head or neck circumference if blank)</span></label><input id="b_hoodHeight" type="number" step="0.1"></div>
+        </div>
+        <div class="field"><label>Bodice front style <span class="hint">(optional — layers a front-panel treatment onto the neckline above; mainly for dresses/tops/bodysuits)</span></label>
+          <select id="b_bodiceFront">
+            <option value="standard">Standard (use the neckline above as-is)</option>
+            <option value="wrap">Wrap bodice</option>
+            <option value="plungev">Plunge V</option>
+            <option value="sweetheart">Sweetheart</option>
+            <option value="straight">Straight (bandeau-style top edge)</option>
+            <option value="bralettecup">Bralette-cup</option>
+            <option value="twistknot">Twist / knot front</option>
+          </select>
+        </div>
+        <div class="field"><label>Cut-out <span class="hint">(optional)</span></label>
+          <select id="b_cutout">
+            <option value="none">None</option>
+            <option value="underbust">Underbust</option>
+            <option value="waist">Waist</option>
+            <option value="centerfront">Center front</option>
+            <option value="sidewaist">Side waist</option>
+            <option value="back">Back</option>
+          </select>
+        </div>
+        <div class="field"><label>Decorative detail <span class="hint">(optional)</span></label>
+          <select id="b_decorativeDetail">
+            <option value="none">None</option>
+            <option value="belt">Belt / sash</option>
+            <option value="waisttie">Waist tie</option>
+            <option value="corsetlaceup">Corset lace-up</option>
+            <option value="sidelaceup">Side lace-up</option>
+            <option value="buttonplacket">Button placket</option>
+          </select>
+        </div>
+        <div class="field"><label>Sleeve shape</label>
+          <select id="b_sleeve" onchange="toggleSleeveLengthFields()">
+            <option value="setin">Straight, fitted taper</option>
+            <option value="bishop">Bishop (full/dropped, gathered cuff)</option>
+            <option value="flare">Flare / bell (tapers out to open edge)</option>
+            <option value="balloon">Balloon / puff, full-length</option>
+            <option value="puffshort">Puff, short (gathered cap sleeve)</option>
+            <option value="legofmutton">Leg-of-mutton (full at cap, fitted cuff)</option>
+            <option value="legofmuttonreverse">Reverse leg-of-mutton (fitted to elbow, puff to wrist)</option>
+            <option value="lantern">Lantern (fitted, sudden puff mid-sleeve, fitted cuff)</option>
+            <option value="cap">Cap (minimal, no shaping)</option>
+            <option value="sleeveless">Sleeveless</option>
+          </select>
+        </div>
+        <div class="sub-fields" id="coldShoulderField">
+          <div class="field"><label><input type="checkbox" id="b_coldShoulder" style="width:auto;margin-right:6px;">Cold-shoulder cutout</label></div>
+        </div>
+        <div class="sub-fields" id="sleeveDirectionField">
+          <div class="field"><label>Sleeve direction</label>
+            <select id="b_sleeveDirection">
+              <option value="cuffToShoulder">Cuff to shoulder (bottom-up)</option>
+              <option value="shoulderToCuff">Shoulder to cuff (top-down)</option>
+            </select>
+          </div>
+        </div>
+        <div class="sub-fields" id="sleeveLengthFields">
+          <div class="field"><label>Sleeve ends at</label>
+            <select id="b_sleeveLengthMode" onchange="refreshSleeveLengthDefault()">
+              <option value="custom">Custom / typed length</option>
+              <option value="elbow">Elbow</option>
+              <option value="wrist">Wrist (full arm)</option>
+            </select>
+          </div>
+          <div class="field"><label>Sleeve length <span class="hint">(cm, underarm to cuff — auto-filled from the landmark above, editable)</span></label><input id="b_sleeveLengthOverride" type="number" step="0.1" placeholder="e.g. 8"></div>
+        </div>
+        <div class="field"><label>Body ends at</label>
+          <select id="b_lengthMode" onchange="refreshLengthDefault()">
+            <option value="custom">Custom / typed length</option>
+            <option value="waist">Waist</option>
+            <option value="hip">Hip</option>
+            <option value="midthigh">Mid-thigh</option>
+            <option value="knee">Knee</option>
+          </select>
+        </div>
+        <div class="field"><label>Total length <span class="hint">(cm, shoulder to hem — auto-filled from the landmark above, editable)</span></label><input id="b_lengthOverride" type="number" step="0.1" placeholder="e.g. 12"></div>
+      </div>
+
+      <!-- PANTS-ONLY FIELDS -->
+      <div class="drawer" id="pantFields">
+        <div class="field"><label>Pant style</label>
+          <select id="b_pantStyle">
+            <option value="straight">Straight leg</option>
+            <option value="skinny">Skinny / fitted</option>
+            <option value="wideleg">Wide leg</option>
+            <option value="bootcut">Flared / bootcut</option>
+            <option value="jogger">Jogger (cuffed)</option>
+          </select>
+        </div>
+        <div class="field"><label>Waistband</label>
+          <select id="b_waistband">
+            <option value="ribbed">Ribbed</option>
+            <option value="elastic">Elastic channel (encased elastic)</option>
+          </select>
+        </div>
+        <div class="field"><label>Leg ends at</label>
+          <select id="b_pantLengthMode" onchange="refreshPantLengthDefault()">
+            <option value="custom">Custom / typed length</option>
+            <option value="knee">Knee (shorts)</option>
+            <option value="ankle">Ankle (full length)</option>
+          </select>
+        </div>
+        <div class="field"><label>Leg length <span class="hint">(cm, crotch to hem — auto-filled from the landmark above, editable)</span></label><input id="b_pantLengthOverride" type="number" step="0.1" placeholder="e.g. 10"></div>
+      </div>
+
+      <!-- SKIRT-ONLY FIELDS -->
+      <div class="drawer" id="skirtFields">
+        <div class="field"><label>Skirt style</label>
+          <select id="b_skirtStyle" onchange="toggleSkirtFields()">
+            <option value="straight">Straight / pencil</option>
+            <option value="aline">A-line</option>
+            <option value="circle">Circle / flared</option>
+            <option value="gathered">Gathered / dirndl</option>
+            <option value="tiered">Tiered</option>
+            <option value="bubble">Bubble / balloon</option>
+            <option value="pleated">Pleated</option>
+            <option value="wrap">Wrap (front overlap)</option>
+            <option value="gored">Gored / panelled</option>
+            <option value="mermaid">Mermaid / trumpet</option>
+          </select>
+        </div>
+        <div class="sub-fields" id="goredFields">
+          <div class="field"><label>Gore count</label>
+            <select id="b_goreCount"><option value="4">4</option><option value="6" selected>6</option><option value="8">8</option><option value="custom">Custom</option></select>
+          </div>
+          <div class="field"><label>Custom gore count <span class="hint">(only used when "Custom" is picked above)</span></label><input id="b_goreCountCustom" type="number" min="3" step="1" placeholder="e.g. 10"></div>
+        </div>
+        <div class="sub-fields" id="wrapFields">
+          <div class="field"><label>Overlap depth <span class="hint">(cm, how far the front panels cross over — blank defaults to about a quarter of the waist)</span></label><input id="b_wrapOverlap" type="number" step="0.1"></div>
+          <div class="field"><label>Closure</label>
+            <select id="b_wrapClosure"><option value="tie">Tie</option><option value="button">Button</option></select>
+          </div>
+        </div>
+        <div class="sub-fields" id="mermaidFields">
+          <div class="field"><label>Flare starts at</label>
+            <select id="b_flareStart">
+              <option value="highhip">High hip</option>
+              <option value="lowhip" selected>Low hip</option>
+              <option value="thigh">Thigh</option>
+              <option value="knee">Knee</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="field"><label>Custom flare start <span class="hint">(cm below waist — only used when "Custom" is picked above)</span></label><input id="b_flareStartCm" type="number" step="0.1"></div>
+        </div>
+        <div class="sub-fields" id="pleatFields">
+          <div class="field"><label>Pleat type</label>
+            <select id="b_pleatType">
+              <option value="knife">Knife</option>
+              <option value="box">Box</option>
+              <option value="invertedbox">Inverted box</option>
+              <option value="accordion">Accordion / gofré</option>
+              <option value="plisse">Plissé</option>
+            </select>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Pleat count <span class="hint">(blank = auto)</span></label><input id="b_pleatCount" type="number" min="2" step="1" placeholder="auto"></div>
+            <div class="field"><label>Finished circumference <span class="hint">(cm, blank = waist)</span></label><input id="b_pleatFinishedCirc" type="number" step="0.1" placeholder="auto"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Pleat face width <span class="hint">(cm, blank = auto)</span></label><input id="b_pleatWidth" type="number" step="0.1" placeholder="auto"></div>
+            <div class="field"><label>Fold depth <span class="hint">(cm, blank = auto)</span></label><input id="b_pleatFoldDepth" type="number" step="0.1" placeholder="auto"></div>
+          </div>
+          <p class="help" style="margin-top:-4px;">Leave any of these blank and the app proportions them from the others (or from the waist and a sensible pleat count) and works out the needle repeat for you.</p>
+        </div>
+        <div class="field"><label>Waistband</label>
+          <select id="b_skirtWaistband">
+            <option value="ribbed">Ribbed</option>
+            <option value="elastic">Elastic channel (encased elastic)</option>
+          </select>
+        </div>
+        <div class="field"><label>Skirt ends at</label>
+          <select id="b_skirtLengthMode" onchange="refreshSkirtLengthDefault()">
+            <option value="custom">Custom / typed length</option>
+            <option value="hip">Hip (very short)</option>
+            <option value="midthigh">Mid-thigh</option>
+            <option value="knee">Knee</option>
+          </select>
+        </div>
+        <div class="field"><label>Skirt length <span class="hint">(cm, waist to hem — auto-filled from the landmark above, editable)</span></label><input id="b_skirtLengthOverride" type="number" step="0.1" placeholder="e.g. 6"></div>
+
+        <div class="section-label">Modifiers <span class="hint" style="font-weight:400;">(layer onto any style above)</span></div>
+        <div class="field"><label><input type="checkbox" id="b_skirtGodets" onchange="toggleSkirtFields()" style="width:auto;display:inline-block;margin-right:6px;">Add godets (triangular flare inserts)</label></div>
+        <div class="sub-fields" id="godetFields">
+          <div class="field"><label>Godet count</label><input id="b_godetCount" type="number" min="1" step="1" placeholder="4"></div>
+        </div>
+        <div class="field"><label><input type="checkbox" id="b_skirtSlit" onchange="toggleSkirtFields()" style="width:auto;display:inline-block;margin-right:6px;">Add a slit</label></div>
+        <div class="sub-fields" id="slitFields">
+          <div class="field"><label>Slit placement</label>
+            <select id="b_slitPlacement"><option value="back">Back, center</option><option value="front">Front, center</option><option value="side">Side</option></select>
+          </div>
+          <div class="field"><label>Slit depth <span class="hint">(cm up from the hem, blank = about a third of the skirt length)</span></label><input id="b_slitDepth" type="number" step="0.1" placeholder="auto"></div>
+        </div>
+      </div>
+
+      <!-- SHARED FIELDS -->
+      <div class="field"><label><input type="checkbox" id="b_pocket" onchange="togglePocketFields()" style="width:auto;display:inline-block;margin-right:6px;">Add a pocket</label></div>
+      <div class="sub-fields" id="pocketFields">
+        <div class="field"><label>Construction</label>
+          <select id="b_pocketConstruction" onchange="togglePocketFields()">
+            <option value="patch">Patch (sewn on)</option>
+            <option value="inset">Inset (knitted into the body)</option>
+            <option value="sideseam">Side-seam (hidden in the seam)</option>
+            <option value="kangaroo">Kangaroo (one bag, two openings — hoodie-style)</option>
+            <option value="splitkangaroo">Split kangaroo (separated at center front)</option>
+          </select>
+        </div>
+        <div class="field" id="pocketShapeField"><label>Shape</label>
+          <select id="b_pocketShape">
+            <option value="square">Square</option>
+            <option value="rounded">Rounded (curved lower corners)</option>
+            <option value="angled">Angled (slanted top edge)</option>
+          </select>
+        </div>
+        <div class="field" id="pocketOpeningField"><label>Opening</label>
+          <select id="b_pocketOpening">
+            <option value="horizontal">Horizontal</option>
+            <option value="vertical">Vertical</option>
+            <option value="slanted">Slanted</option>
+          </select>
+        </div>
+        <div class="field"><label>Finish</label>
+          <select id="b_pocketFinish">
+            <option value="plain">Plain</option>
+            <option value="ribbed">Ribbed edge</option>
+            <option value="welt">Welt</option>
+            <option value="flap">Flap</option>
+          </select>
+        </div>
+        <div class="field"><label>Closure</label>
+          <select id="b_pocketClosure">
+            <option value="none">None</option>
+            <option value="button">Button</option>
+          </select>
+        </div>
+        <div class="field"><label>Placement</label>
+          <select id="b_pocketPlacement">
+            <option value="fronthip">Front hip</option>
+            <option value="chest">Chest</option>
+            <option value="side">Side</option>
+            <option value="back">Back</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="field" id="pocketDepthField"><label>Pocket depth <span class="hint">(cm, optional — blank auto-fills)</span></label><input id="b_pocketDepth" type="number" step="0.1"></div>
+        <div class="field" id="pocketBagWidthField"><label>Pocket bag width <span class="hint">(cm, optional — blank auto-fills)</span></label><input id="b_pocketBagWidth" type="number" step="0.1"></div>
+      </div>
+      <div class="drawer show" id="hemDrawer">
+        <div class="field"><label id="hemLabelText">Hem</label>
+          <select id="b_hem"><option value="rib">Ribbed</option><option value="rolled">Rolled stocking stitch</option><option value="picot">Picot</option></select>
+        </div>
+        <div class="field"><label>Rib/band height <span class="hint">(cm — applies to hem, cuffs, waistband, and plain ribbed neckbands; blank = 1cm)</span></label><input id="b_ribHeight" type="number" step="0.1" placeholder="1"></div>
+      </div>
+      <div class="field"><label>Main stitch pattern</label>
+        <select id="b_stitch">
+          <option value="stocking">Stocking stitch</option>
+          <option value="rice">Rice stitch</option>
+          <option value="garter">Garter stitch</option>
+          <option value="seed">Seed stitch</option>
+          <option value="doubleseed">Double seed stitch</option>
+          <option value="hurdle">Hurdle pattern</option>
+          <option value="garterrib">Garter rib</option>
+          <option value="basketweave">K3P3 basketweave</option>
+          <option value="k2p2rib">K2P2 rib</option>
+        </select>
+      </div>
+      <div class="field"><label>Fit</label>
+        <select id="b_fit"><option value="close">Close-fitting</option><option value="standard" selected>Standard</option><option value="loose">Loose</option></select>
+      </div>
+      <div class="field"><label>Pattern format</label>
+        <select id="b_format">
+          <option value="narrative">Narrative (explains as it goes)</option>
+          <option value="rowbyrow">Row-by-row (R1-4: rib, R5: dec, etc.)</option>
+        </select>
+        <p class="help" style="margin:4px 0 0;">Row-by-row covers Back, Front(s), Sleeves and collars for Set-in and Drop-shoulder (Raglan is approximate), including Left/Right cardigan fronts for buttoned, open and zipped closures. Where a piece isn't row-by-row yet you'll get a clear note.</p>
+      </div>
+
+      <button class="btn" onclick="generatePattern()">Generate pattern</button>
+      <p class="help" style="margin-top:10px;">Change the doll or gauge above and generate again to grade the same design to another size, or to recompute it for the other knitting method.</p>
+    </div>
+    <div id="outputHolder"></div>
+  </div>
+
+  <!-- SAVED -->
+  <div class="panel" id="panel-saved">
+    <h3 style="margin:0 0 8px;">Collections</h3>
+    <div class="btn-row" style="margin-top:0;"><button class="btn small secondary" onclick="createCollection()">+ New collection</button></div>
+    <ul class="entry-list" id="collectionList" style="margin-top:8px;"></ul>
+
+    <h3 style="margin:16px 0 8px;">Saved patterns</h3>
+    <div class="field"><input id="savedSearch" placeholder="Search saved patterns…" oninput="renderSaved()"></div>
+    <ul class="entry-list" id="savedList"></ul>
+  </div>
+
+  <!-- CUSTOM GRADE -->
+  <div class="panel" id="panel-customgrade">
+    <div class="card">
+      <h3 id="gradeFormTitle">Add your own pattern for grading</h3>
+      <p class="help">Enter the numbers exactly as your original pattern has them. This tool won't rewrite your instructions — it scales your stitch and row counts to a different doll, proportionally, so you can plug the new numbers back into your own pattern.</p>
+      <p class="help">For "Scale by": pick a <em>circumference</em> (chest, hip, waist...) for stitch counts around the body, and a <em>length</em> (shoulder to waist/hip/mid-thigh/knee/elbow/wrist) for row counts — total rows, where shaping starts, hem depth, sleeve length. Using a length for a length keeps proportions honest even when two dolls have different torso-to-leg ratios; using height for everything is a rougher stand-in.</p>
+      <div class="field"><label>Pattern label</label><input id="grd_label" placeholder="e.g. My striped MSD cardigan"></div>
+      <div class="field"><label>Originally fitted to (doll)</label><select id="grd_refDoll"></select></div>
+      <div class="field"><label>Originally knit at (gauge)</label><select id="grd_refGauge"></select></div>
+      <p class="help" style="margin-top:-4px;">Both come from what you've already saved in Dolls and Gauge & Yarn — add the doll or gauge there first if it's not listed.</p>
+
+      <div class="section-label">Measurements to grade</div>
+      <div id="gradeRowsContainer"></div>
+      <button class="btn small secondary" onclick="addGradeRow()">+ Add measurement</button>
+
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn" onclick="saveReferencePattern()">Save reference pattern</button>
+        <button class="btn secondary" onclick="clearGradeForm()" id="gradeCancelBtn" style="display:none;">Cancel edit</button>
+      </div>
+    </div>
+    <h3 style="margin:16px 0 8px;">Your custom patterns</h3>
+    <ul class="entry-list" id="customGradeList"></ul>
+  </div>
+
+  <!-- Fallback panels: prompt()/clipboard/downloads can be unreliable inside a sandboxed artifact, so these always work -->
+  <div id="savePanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:999;padding:20px;">
+    <div style="background:var(--panel);max-width:420px;margin:60px auto;padding:16px;border:2px solid var(--ink);">
+      <h3 style="margin-top:0;">Name this pattern</h3>
+      <div class="field"><input id="saveNameInput" placeholder="e.g. Liam's fall sweater"></div>
+      <div id="updateExistingRow" style="display:none;margin:2px 0 10px;">
+        <label style="display:flex;gap:6px;align-items:flex-start;font-size:0.8rem;font-weight:400;line-height:1.4;">
+          <input type="checkbox" id="updateExistingCheck" checked style="margin-top:3px;"> Update the original saved pattern instead of adding a new one
+        </label>
+      </div>
+      <div id="savePanelStatus" class="help" style="margin:0 0 8px;"></div>
+      <div class="btn-row">
+        <button class="btn" onclick="confirmSavePattern()">Save</button>
+        <button class="btn secondary" onclick="closeSavePanel()">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div id="exportPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:999;padding:20px;">
+    <div style="background:var(--panel);max-width:600px;margin:30px auto;padding:16px;border:2px solid var(--ink);">
+      <h3 style="margin-top:0;" id="exportPanelTitle">Pattern text</h3>
+      <p class="help">If Copy/Download didn't do anything on their own, tap the text below, select all, and copy manually — this always works.</p>
+      <textarea id="exportTextarea" readonly style="width:100%;height:280px;font-family:var(--mono);font-size:0.78rem;padding:8px;border:1px solid var(--line);"></textarea>
+      <div class="btn-row">
+        <button class="btn secondary" onclick="selectExportText()">Select all</button>
+        <button class="btn secondary" onclick="closeExportPanel()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/platform.js"></script>
+<script src="js/backup.js"></script>
+<script src="js/drawing.js"></script>
+<script src="js/dolls.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

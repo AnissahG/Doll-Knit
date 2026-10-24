@@ -148,6 +148,7 @@ function toggleHatFields(){
   document.getElementById('hatPointFields').classList.toggle('show', document.getElementById('b_hatCrown').value==='pointed');
 }
 
+function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 function numOr(v){ const n=parseFloat(String(v==null?"":v).replace(",",".")); return isFinite(n)?n:0; }
 
 // ---------- gauges ----------
@@ -786,7 +787,7 @@ function generatePatternCore(doll, gauge){
   const yardageMeters = estimateYardage(gauge, bodySts, totalBodyRows, opts.sleeve, opts.sleeveLengthOverride, m, stsPerCm, rowsPerCm);
   drawSpec = {kind:'top', garment:opts.garment, chest:bodySts/stsPerCm, hem:sil.hemSts*2/stsPerCm, length:totalLength, armhole:m.armholeDepth, silhouette:opts.silhouette,
     sleeve:opts.sleeve, sleeveLen: opts.sleeve==='cap' ? m.armholeDepth*0.35 : (opts.sleeve==='puffshort' ? Math.min(opts.sleeveLengthOverride||3, m.armholeDepth) : (opts.sleeveLengthOverride||0)),
-    upperArm:m.upperArmCirc*(1+ease), cuff:(m.wristCirc||m.upperArmCirc*0.72)*(1+ease), neck:opts.neck, collar:opts.collar, neckCirc:m.neckCirc, construction:opts.construction,
+    upperArm:m.upperArmCirc*(1+ease), cuff: opts.sleeve==='flare' ? flareCuffSts(m, ease, stsPerCm)/stsPerCm : (m.wristCirc||m.upperArmCirc*0.72)*(1+ease), neck:opts.neck, collar:opts.collar, neckCirc:m.neckCirc, construction:opts.construction,
     cardigan:isCardigan, closure:opts.cardiganClosure, buttons:opts.buttons, frontShape:opts.cardiganFrontShape, pocket:opts.pocket, stitch:opts.stitch, hemStyle:opts.hem, rib:hemRows/rowsPerCm,
     waistY:m.shoulderToWaist||0, shoulderW:m.shoulderWidth, bodiceFront:opts.bodiceFront, coldShoulder:opts.coldShoulder, opening:opts.opening};
 
@@ -1385,6 +1386,49 @@ function renderPocket(opts, bodySts, stsPerCm, rowsPerCm, method){
   return `<h4>Kangaroo pocket (one bag, two openings)</h4><p>Separately, ${castOnWord} <span class="count">${bagSts} sts</span> and work ${bagRows} rows in stocking stitch for the single shared lining bag, ${placementText}.</p><p>On the body, leave two diagonal (or side) openings — one on each side, angling in toward the center — held on waste yarn the same way as a horizontal inset. Work the body across the lining's live stitches in the gap between the two openings so the lining sits behind both.</p><p>Pick up stitches around each opening separately and work 1x1 rib for ${edgeRows} rows on each, then sew the lining's side edges down on the wrong side so both hands can enter from either side into the one shared bag.</p>`;
 }
 
+// A bell sleeve must end WIDER than the upper arm. (It used to be wrist × 1.3, which on most dolls is
+// narrower than the upper arm — so the "flare" tapered in and, with a rib cuff, read as a balloon.)
+function flareCuffSts(m, ease, stsPerCm){
+  const upperArm = m.upperArmCirc*(1+ease), wrist = (m.wristCirc || m.upperArmCirc*0.72)*(1+ease);
+  return toEven(Math.max(upperArm*1.7, wrist*2.5)*stsPerCm);
+}
+// The edge at the cuff end of a fitted or flared sleeve. Its rows are part of the sleeve length.
+function sleeveEdge(kind, hem, cuffRows, rowsPerCm){
+  if(kind==='flare'){
+    if(hem==='picot') return {rows: 3, text: 'Finish with a picot edge (k1, *yo, k2tog; rep from *, then a few rows of stocking stitch to fold under) so the bell hangs free.'};
+    const g = Math.max(2, Math.round(0.4*rowsPerCm/2)*2);
+    return {rows: g, text: `Work ${g} rows (or rounds) of garter stitch for a flat edge — not rib: rib pulls in and would gather the bell back into a balloon.`};
+  }
+  return hem==='rib' ? {rows: cuffRows, text: `Work 1x1 rib for ${cuffRows} rows for the cuff.`} : {rows: 0, text: ''};
+}
+// Shaping of a fitted (set-in) or flared (bell) sleeve, as segments from the shoulder down to the cuff edge.
+function taperSleeveSegments(kind, m, ease, stsPerCm, lenCm, bodyRows, armholeRows){
+  const capSts = toEven(m.upperArmCirc*(1+ease)*stsPerCm);
+  if(kind==='flare'){
+    const bellSts = flareCuffSts(m, ease, stsPerCm);
+    const elbowCm = m.shoulderToElbow || (m.shoulderToWrist ? m.shoulderToWrist*0.55 : 0);
+    const pastElbow = elbowCm && lenCm > elbowCm*1.15;  // a long sleeve: fitted to the elbow, then the bell
+    const fittedRows = pastElbow ? Math.min(bodyRows-2, Math.round(bodyRows*elbowCm/lenCm)) : Math.min(bodyRows-2, Math.round(bodyRows*0.15));
+    const elbowSts = pastElbow ? Math.min(capSts, m.elbowCirc ? toEven(m.elbowCirc*(1+ease)*stsPerCm) : toEven(capSts*0.88)) : capSts;
+    return {capSts, edgeSts: bellSts, segs: [
+      {rows: Math.max(0, fittedRows), from: capSts, to: elbowSts, note: pastElbow ? 'fitted down to the elbow' : '', upNote: pastElbow ? 'fitted from the elbow up to the underarm' : ''},
+      {rows: Math.max(2, bodyRows - Math.max(0, fittedRows)), from: elbowSts, to: bellSts, note: 'the bell widening toward the cuff', upNote: 'narrowing from the bell up to the elbow'}]};
+  }
+  const wristSts = toEven((m.wristCirc||m.upperArmCirc*0.72)*(1+ease)*stsPerCm);
+  const straight = Math.max(0, Math.min(bodyRows-1, Math.round(armholeRows*0.35)));
+  return {capSts, edgeSts: wristSts, segs: [{rows: straight, from: capSts, to: capSts}, {rows: Math.max(1, bodyRows - straight), from: capSts, to: wristSts}]};
+}
+// One segment in words. Top-down hand-knit sleeves are picked up and worked in the round.
+function sleeveSegText(seg, method, inRound){
+  const unit = inRound ? 'rounds' : 'rows';
+  if(seg.from===seg.to) return `work straight for ${seg.rows} ${unit}`;
+  const verb = seg.to>seg.from ? 'increase' : 'decrease';
+  let t = distribute(Math.abs(seg.to-seg.from)/2, seg.rows, verb).text;
+  if(inRound) t = t.replace(/at each end/g, 'on each side of the underarm marker').replace(/row\(s\)/g, 'round(s)');
+  return methodPhrase(method, t) + ` over ${seg.rows} ${unit} (${seg.from} → ${seg.to} sts${seg.note ? ', '+seg.note : ''})`;
+}
+const FLARE_NOTE = `<div class="note" style="margin-top:6px;">For a true bell: the sleeve stays close to the arm at the top and only widens below, ending well wider than the upper arm, with an edge that doesn't draw in. If your bell comes out puffy instead, check the cuff edge isn't ribbed and that the bind-off is loose — a tight bind-off gathers the hem just like rib does.</div>`;
+
 function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, lengthOverride, hem, construction, cuffRows, direction, sleeveDropCm){
   const method = gauge.method;
   const lenCm = lengthOverride ? Math.max(0.5, lengthOverride - (sleeveDropCm||0)) : m.armholeDepth*0.15; // only 'cap' reaches here without an override; cap sleeves are too short for drop compensation to apply
@@ -1396,7 +1440,7 @@ function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, le
   const upperArmEase = m.upperArmCirc*(1+ease);
   const capSts = toEven(upperArmEase*stsPerCm);
   const cuffBandSts = toEven((m.wristCirc||m.upperArmCirc*0.72)*(1+ease)*stsPerCm);
-  const flareSts = toEven((m.wristCirc||m.upperArmCirc*1.35)*(1+ease)*stsPerCm*1.3);
+  const flareSts = flareCuffSts(m, ease, stsPerCm);
   const muttonSts = toEven(capSts*1.6);
   const puffSts = toEven(capSts*1.25);
   const elbowSts = m.elbowCirc ? toEven(m.elbowCirc*(1+ease)*stsPerCm) : cuffBandSts; // falls back to wrist-band snugness if no elbow measurement is on file
@@ -1467,12 +1511,12 @@ function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, le
       <p>On the next row, increase suddenly from <span class="count">${capSts} sts</span> to <span class="count">${lanternSts} sts</span> in a single row — this abrupt jump, not a gradual curve, is what gives a lantern sleeve its bracketed shape, distinct from a balloon sleeve's gradual swell. Work straight at this full width for ${midRows} rows.</p>
       <p>On the next row, decrease suddenly from <span class="count">${lanternSts} sts</span> back down to <span class="count">${cuffBandSts} sts</span> in a single row. Work straight (fitted) for ${cuffFittedRows} more rows.${hem==='rib'?` Work rib for the cuff for ${cuffRows} rows.`:''} Bind off.</p>`;
     } else { // setin (fitted taper) / flare
-      const shapingRows = Math.max(1, sleeveLenRows - Math.round(armholeRows*0.35));
-      const straightRowsFirst = Math.max(0, sleeveLenRows - shapingRows);
-      const verb = cuffSts<capSts ? 'decrease' : 'increase';
-      const shape = distribute(Math.abs(capSts-cuffSts)/2, shapingRows, verb);
-      tdBody = `<p>${pickupWord} <span class="count">${capSts} sts</span> evenly around the armhole opening${isDropShoulder?' (flat armhole here, so this pickup is straightforward)':', following the curve of the armhole shaping'}.</p>
-      <p>Work straight for ${straightRowsFirst} rows, then ${methodPhrase(method,'shape the sleeve: '+shape.text)} down to the cuff, ending with <span class="count">${cuffSts} sts</span>.${hem==='rib'?` Work rib for the cuff for ${cuffRows} rows.`:''} Bind off.</p>`;
+      const edge = sleeveEdge(kind, hem, cuffRows, rowsPerCm);
+      const sh = taperSleeveSegments(kind, m, ease, stsPerCm, lenCm, Math.max(3, sleeveLenRows - edge.rows), armholeRows);
+      const inRound = method==='hand';
+      tdBody = `<p>${pickupWord} <span class="count">${sh.capSts} sts</span> evenly around the armhole opening${isDropShoulder?' (flat armhole here, so this pickup is straightforward)':', following the curve of the armhole shaping'}${inRound?', and join to work in the round with a marker at the underarm':''}.</p>
+      <p>${sh.segs.filter(s=>s.rows>0).map(s=>sleeveSegText(s, method, inRound)).join(', then ')}, ending with <span class="count">${sh.edgeSts} sts</span>.</p>
+      <p>${edge.text} Bind off${kind==='flare'?' loosely (a needle size up)':''}.</p>${kind==='flare'?FLARE_NOTE:''}`;
     }
     return `<h4>Sleeves — ${kindLabel}, shoulder to cuff (make 2)</h4>${tdBody}<div class="note" style="margin-top:6px;">Worked top-down by picking up around the armhole rather than shaping a separate cap — this sidesteps having to mirror a curved cap-decrease formula into an increase, and is how most real top-down sleeves are worked anyway.</div>${dropNote}`;
   }
@@ -1539,14 +1583,13 @@ function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, le
     body = `<p>${castOnWord} <span class="count">${cuffBandSts} sts</span>${hem==='rib'?` and work rib for the cuff for ${cuffRows} rows.`:'.'} Work straight (fitted) for ${cuffFittedRows} more rows.</p>
     <p>On the next row, increase suddenly from <span class="count">${cuffBandSts} sts</span> to <span class="count">${lanternSts} sts</span> in a single row — this abrupt jump, not a gradual curve, is what gives a lantern sleeve its bracketed shape, distinct from a balloon sleeve's gradual swell. Work straight at this full width for ${midRows} rows.</p>
     <p>On the next row, decrease suddenly from <span class="count">${lanternSts} sts</span> back down to <span class="count">${capSts} sts</span> in a single row. Work straight (fitted) for ${capFittedRows} more rows to the underarm. ${capText}</p>`;
-  } else { // setin (fitted taper) / flare
-    const shapingRows = Math.max(1, sleeveLenRows - Math.round(armholeRows*0.35));
-    const verb = cuffSts<capSts?'increase':'decrease';
-    const inc = distribute(Math.abs(capSts-cuffSts)/2, shapingRows, verb);
-    const straightRowsAfter = Math.max(0, sleeveLenRows - shapingRows);
-    body = `<p>${castOnWord} <span class="count">${cuffSts} sts</span>${hem==='rib'?` and work rib for the cuff for ${cuffRows} rows, matching the body hem depth.`:'.'}</p>
-    <p>${methodPhrase(method,'Shape the sleeve: '+inc.text)} until <span class="count">${capSts} sts</span> are on the needle. Work straight for ${straightRowsAfter} more rows to the underarm.</p>
-    <p>${capText}</p>`;
+  } else { // setin (fitted taper) / flare — the same plan as top-down, worked from the cuff up
+    const edge = sleeveEdge(kind, hem, cuffRows, rowsPerCm);
+    const sh = taperSleeveSegments(kind, m, ease, stsPerCm, lenCm, Math.max(3, sleeveLenRows - edge.rows), armholeRows);
+    const up = sh.segs.slice().reverse().filter(s=>s.rows>0).map(s=>({...s, from:s.to, to:s.from, note:s.upNote||''}));
+    body = `<p>${castOnWord} <span class="count">${sh.edgeSts} sts</span>${kind==='flare'?' loosely':''}. ${edge.text}</p>
+    <p>${up.map(s=>sleeveSegText(s, method, false)).join(', then ')}, until <span class="count">${sh.capSts} sts</span> are on the needle at the underarm.</p>
+    <p>${capText}</p>${kind==='flare'?FLARE_NOTE:''}`;
   }
   return `<h4>Sleeves — ${kindLabel}${isDropShoulder?', flat top (drop shoulder)':''} (make 2)</h4>${body}${dropNote}`;
 }
@@ -3078,7 +3121,7 @@ function generateBodysuitPattern(doll, gauge){
       frontHtml = `<h4>Front</h4><p>${castOnWord} <span class="count">${sil.hemSts} sts</span>. Work as Back to the start of neck shaping.</p>${necklineBlock}`;
     }
   } else {
-    backHtml = `<h4>Back</h4><p>${castOnWord} <span class="count">${sil.hemSts} sts</span> (this becomes the crotch/leg-opening edge, worked up toward the underarm). ${sil.text}</p>${constructionBlock}${backNeckBlock}`;
+    backHtml = `<h4>Back</h4><p>${castOnWord} <span class="count">${sil.hemSts} sts</span> (this becomes the crotch/leg-opening edge, worked up toward the underarm). ${capFirst(sil.text)}</p>${constructionBlock}${backNeckBlock}`;
     frontHtml = `<h4>Front</h4><p>${castOnWord} <span class="count">${sil.hemSts} sts</span>. Work as Back to the start of neck shaping (same silhouette and armhole shaping).</p>${necklineBlock}`;
     if(format==='rowbyrow' && !supportsRowByRow){
       backHtml = `<div class="warn">Row-by-row isn't built yet for this shoulder construction on a bodysuit — showing the narrative version below instead.</div>` + backHtml;
@@ -3090,7 +3133,7 @@ function generateBodysuitPattern(doll, gauge){
     : `<p class="note" style="margin:6px 0 0;">Pull-on construction: the center gusset is simply sewn closed — this relies on the fabric's own stretch to get the bodysuit on and off, which is usually enough at this gauge and ease.</p>`;
 
   drawSpec = {kind:'bodysuit', chest:bodySts/stsPerCm, hem:sil.hemSts*2/stsPerCm, torso:torsoRows/rowsPerCm, armhole:m.armholeDepth, legOpen:legPickupSts/stsPerCm,
-    neck:opts.neck, collar:opts.collar, sleeve:opts.sleeve, sleeveLen:opts.sleeveLengthOverride||0, upperArm:m.upperArmCirc*(1+ease), cuff:(m.wristCirc||m.upperArmCirc*0.72)*(1+ease), neckCirc:m.neckCirc,
+    neck:opts.neck, collar:opts.collar, sleeve:opts.sleeve, sleeveLen:opts.sleeveLengthOverride||0, upperArm:m.upperArmCirc*(1+ease), cuff: opts.sleeve==='flare' ? flareCuffSts(m, ease, stsPerCm)/stsPerCm : (m.wristCirc||m.upperArmCirc*0.72)*(1+ease), neckCirc:m.neckCirc,
     construction:opts.construction, closure:opts.closure, stitch:opts.stitch, silhouette:opts.silhouette};
   const crotchHtml = `<h4>Crotch &amp; leg openings</h4><p>Once Back and Front each reach <span class="count">${sil.hemSts} sts</span> at the base, bind off the center <span class="count">${crotchGussetSts} sts</span> on each piece (this is the crotch gusset). Leave the remaining <span class="count">${perLegSts} sts</span> on each side of each piece live on a holder.</p><p>Sew the two side seams (underarm to leg opening) and the center gusset bind-off edges (Front to Back) closed. For each leg opening, pick up <span class="count">${legPickupSts} sts</span> evenly around the combined Front+Back edge and work 1x1 rib for ${legBandRows} rows; bind off in rib.</p>${closureNote}`;
 
@@ -3263,7 +3306,7 @@ Bodice length: ${bodiceLengthCm.toFixed(1)}cm / ${bodiceRows} rows · Leg length
       ${bodiceHtml}
       ${necklineBlock}
       <p>Sew or graft shoulder seams.</p>${(drawSpec = {kind:'jumpsuit', chest:bodySts/stsPerCm, waist:waistSts/stsPerCm, hip:hipSts/stsPerCm, bodice:bodiceRows/rowsPerCm, armhole:m.armholeDepth, rise:m.hipToCrotch, legLen:legLenCm, legOpen:legOpenSts/stsPerCm, thigh:thighSts/stsPerCm, shorts:isShorts,
-        neck:opts.neck, collar:opts.collar, sleeve:opts.sleeve, sleeveLen:opts.sleeveLengthOverride||0, upperArm:m.upperArmCirc*(1+ease), cuff:(m.wristCirc||m.upperArmCirc*0.72)*(1+ease), neckCirc:m.neckCirc, construction:opts.construction, stitch:opts.stitch, pocket:opts.pocket}, '')}
+        neck:opts.neck, collar:opts.collar, sleeve:opts.sleeve, sleeveLen:opts.sleeveLengthOverride||0, upperArm:m.upperArmCirc*(1+ease), cuff: opts.sleeve==='flare' ? flareCuffSts(m, ease, stsPerCm)/stsPerCm : (m.wristCirc||m.upperArmCirc*0.72)*(1+ease), neckCirc:m.neckCirc, construction:opts.construction, stitch:opts.stitch, pocket:opts.pocket}, '')}
       ${sleeveBlock}
       ${collarBlock}
       ${legsHtml}
@@ -4345,7 +4388,9 @@ function renderPatternRowByRow(d){
     const lenCm = d.opts.sleeveLengthOverride ? Math.max(0.5, d.opts.sleeveLengthOverride - (d.sleeveDropCm||0)) : d.m.armholeDepth*0.15;
     const sleeveLenRows = Math.max(2, Math.round(lenCm*d.rowsPerCm));
     const capSts = toEven(d.m.upperArmCirc*(1+d.ease)*d.stsPerCm);
-    const cuffSts = d.opts.sleeve==='cap' ? capSts : d.opts.sleeve==='flare' ? toEven((d.m.wristCirc||d.m.upperArmCirc*1.35)*(1+d.ease)*d.stsPerCm*1.3) : toEven((d.m.wristCirc||d.m.upperArmCirc*0.72)*(1+d.ease)*d.stsPerCm);
+    const rbEdge = d.opts.sleeve==='cap' ? {rows:0, text:''} : sleeveEdge(d.opts.sleeve, d.opts.hem, Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm)), d.rowsPerCm);
+    const rbSleeve = taperSleeveSegments(d.opts.sleeve, d.m, d.ease, d.stsPerCm, lenCm, Math.max(3, sleeveLenRows - rbEdge.rows), d.armholeRows);
+    const cuffSts = d.opts.sleeve==='cap' ? capSts : rbSleeve.edgeSts;
     const shapeLabel = d.opts.sleeve==='cap' ? 'cap' : d.opts.sleeve==='flare' ? 'flare / bell' : 'straight, fitted taper';
     const sp = newPlan();
     if(isTopDownSleeve){
@@ -4354,22 +4399,23 @@ function renderPatternRowByRow(d){
         planAdd(sp, sleeveLenRows, stitchLabel);
         planAddOne(sp, `bind off all ${cuffSts} sts`);
       } else {
-        const shapingRows = Math.max(1, sleeveLenRows - Math.round(d.armholeRows*0.35));
-        const straightFirst = Math.max(0, sleeveLenRows - shapingRows);
-        const verb = cuffSts<capSts?'dec':'inc';
-        planAdd(sp, straightFirst, stitchLabel);
-        planShape(sp, Math.abs(capSts-cuffSts)/2, shapingRows, `${verb} 1 st each end`, stitchLabel);
+        for(const s of rbSleeve.segs){
+          if(s.from===s.to) planAdd(sp, s.rows, stitchLabel);
+          else planShape(sp, Math.abs(s.to-s.from)/2, s.rows, `${s.to>s.from?'inc':'dec'} 1 st each end`, stitchLabel);
+        }
+        planAdd(sp, rbEdge.rows, d.opts.sleeve==='flare' ? 'garter stitch (flat edge — not rib)' : '1x1 rib (cuff)');
       }
-      sleeveHtml = `<h4>Sleeves — ${shapeLabel}, shoulder to cuff${isDropShoulder?', flat top (drop shoulder)':''} (make 2)</h4><p>${pickupWord} <span class="count">${capSts} sts</span> evenly around the armhole opening.</p><div class="schematic">${renderPlan(sp).join('\n')}\n${d.opts.hem==='rib'?`work ${Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm))} rows of 1x1 rib for the cuff, then `:''}bind off</div><div class="note" style="margin-top:6px;">Worked top-down by picking up around the armhole rather than shaping a separate cap.</div>${dropNoteRB}`;
+      sleeveHtml = `<h4>Sleeves — ${shapeLabel}, shoulder to cuff${isDropShoulder?', flat top (drop shoulder)':''} (make 2)</h4><p>${pickupWord} <span class="count">${capSts} sts</span> evenly around the armhole opening.</p><div class="schematic">${renderPlan(sp).join('\n')}\nbind off${d.opts.sleeve==='flare'?' loosely':''}</div><div class="note" style="margin-top:6px;">Worked top-down by picking up around the armhole rather than shaping a separate cap.</div>${d.opts.sleeve==='flare'?FLARE_NOTE:''}${dropNoteRB}`;
     } else {
       if(d.opts.sleeve==='cap'){
         planAdd(sp, sleeveLenRows, stitchLabel);
         planAddOne(sp, `bind off all ${cuffSts} sts`);
       } else {
-        const shapingRows = Math.max(1, sleeveLenRows - Math.round(d.armholeRows*0.35));
-        const verb = cuffSts<capSts?'inc':'dec';
-        planShape(sp, Math.abs(capSts-cuffSts)/2, shapingRows, `${verb} 1 st each end`, stitchLabel);
-        planAdd(sp, Math.max(0, sleeveLenRows - shapingRows), stitchLabel);
+        planAdd(sp, rbEdge.rows, d.opts.sleeve==='flare' ? 'garter stitch (flat edge — not rib)' : '1x1 rib (cuff)');
+        for(const s of rbSleeve.segs.slice().reverse()){
+          if(s.from===s.to) planAdd(sp, s.rows, stitchLabel);
+          else planShape(sp, Math.abs(s.to-s.from)/2, s.rows, `${s.from>s.to?'inc':'dec'} 1 st each end`, stitchLabel);
+        }
         if(isDropShoulder){
           planAddOne(sp, `bind off all ${capSts} sts`);
         } else {
@@ -4381,7 +4427,7 @@ function renderPatternRowByRow(d){
           planAddOne(sp, `bind off remaining sts / place on holder`);
         }
       }
-      sleeveHtml = `<h4>Sleeves — ${shapeLabel}${isDropShoulder?', flat top (drop shoulder)':''} (make 2)</h4><p>${castOnWord} <span class="count">${cuffSts} sts</span>${d.opts.hem==='rib'?` and work ${Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm))} rows of 1x1 rib for the cuff (not counted in the rows below).`:'.'}</p><div class="schematic">${renderPlan(sp).join('\n')}</div>${dropNoteRB}`;
+      sleeveHtml = `<h4>Sleeves — ${shapeLabel}${isDropShoulder?', flat top (drop shoulder)':''} (make 2)</h4><p>${castOnWord} <span class="count">${cuffSts} sts</span>${d.opts.sleeve==='flare'?' loosely':''}.</p><div class="schematic">${renderPlan(sp).join('\n')}</div>${d.opts.sleeve==='flare'?FLARE_NOTE:''}${dropNoteRB}`;
     }
   } else if(d.opts.sleeve==='balloon'){
     const isDropShoulder = d.opts.construction==='square';
@@ -4696,7 +4742,7 @@ Fit: ${d.opts.fit} · Stitch: ${stitchLabel}</div>
       ${d.yardageMeters ? `<p class="help" style="margin:0 0 10px;">Estimated yarn needed: <span class="count">~${Math.ceil(d.yardageMeters)}m</span> (from the swatch yardage on this gauge, plus ~15% for seaming and ends — buy a bit extra).</p>` : `<p class="help" style="margin:0 0 10px;">Add "yarn used for a 10x10cm swatch" to this gauge entry to get a yarn-amount estimate here next time.</p>`}
 
       <h4>${d.isCardigan?'Back':'Back'}</h4>
-      <p>${castOnWord} <span class="count">${d.sil.hemSts} sts</span>.${d.hemRows?` Work ${hemLabel} for ${d.hemRows} rows.`:''} Change to ${stitchLabel}. ${d.sil.text}</p>
+      <p>${castOnWord} <span class="count">${d.sil.hemSts} sts</span>.${d.hemRows?` Work ${hemLabel} for ${d.hemRows} rows.`:''} Change to ${stitchLabel}. ${capFirst(d.sil.text)}</p>
       ${d.constructionBlock}
       ${d.backNeckBlock}
 

@@ -133,7 +133,7 @@ function drawSleeve(c, side, a, b, len, cuffHalf, kind, ribCm, angle = 50) {
   const W = {
     setin: [[0, top], [1, cuff]],
     bishop: [[0, top], [0.82, top * 1.3], [0.9, top * 1.2], [0.91, cuff], [1, cuff]],
-    flare: [[0, top], [0.45, top * 0.95], [1, Math.max(top * 1.45, cuff * 1.6)]],
+    flare: [[0, top], [0.4, top * 0.92], [1, Math.max(cuff, top * 1.3)]],
     balloon: [[0, top], [0.5, top * 1.55], [0.92, cuff * 1.1], [1, cuff]],
     puffshort: [[0, top], [0.55, top * 1.45], [0.85, top * 1.05], [1, top * 0.9]],
     legofmutton: [[0, top * 1.05], [0.22, top * 1.55], [0.6, cuff * 1.15], [1, cuff]],

@@ -1,6 +1,6 @@
 // Doll knit Pattern Studio — offline app-shell cache (PWA only; the APK bundles its files).
 // Bump CACHE_NAME whenever any file changes so returning visitors get the new version.
-const CACHE_NAME = 'doll-knit-v27';
+const CACHE_NAME = 'doll-knit-v28';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/platform.js', './js/backup.js', './js/drawing.js', './js/dolls.js', './js/app.js',

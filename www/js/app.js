@@ -189,13 +189,13 @@ function editGauge(id){
   const g = gauges.find(x=>x.id===id); if(!g) return;
   editingGaugeId = id;
   document.getElementById('g_name').value = g.name;
-  document.getElementById('g_method').value = g.method;
-  document.getElementById('g_yarn').value = g.yarn;
-  document.getElementById('g_tool').value = g.tool;
+  document.getElementById('g_method').value = g.method || 'hand';
+  document.getElementById('g_yarn').value = g.yarn || '';
+  document.getElementById('g_tool').value = g.tool || '';
   document.getElementById('g_tension').value = g.tension||'';
   document.getElementById('g_sts').value = g.stsPer10;
   document.getElementById('g_rows').value = g.rowsPer10;
-  document.getElementById('g_notes').value = g.notes;
+  document.getElementById('g_notes').value = g.notes || '';
   document.getElementById('g_yardage').value = g.yardagePer100cm2||'';
   toggleGaugeToolLabel();
   document.getElementById('gaugeFormTitle').textContent = 'Edit gauge';
@@ -766,7 +766,7 @@ function generatePatternCore(doll, gauge){
 
   let sleeveBlock = '';
   if(opts.sleeve!=='sleeveless'){
-    sleeveBlock = renderSleeve(opts.sleeve, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, opts.sleeveLengthOverride, opts.hem, opts.construction, hemRows, opts.sleeveDirection, sleeveDropCm);
+    sleeveBlock = renderSleeve(opts.sleeve, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, opts.sleeveLengthOverride, opts.hem, opts.construction, hemRows, opts.sleeveDirection, sleeveDropCm, {ub: underarmBindOff, neckSts});
   } else {
     const armholePickupSts = toEven(m.armholeDepth*2*stsPerCm*1.05);
     const armholeBandRows = Math.max(2, Math.round((opts.ribHeight||0.6)*rowsPerCm));
@@ -781,7 +781,7 @@ function generatePatternCore(doll, gauge){
 
   const pocketBlock = opts.pocket ? renderPocket(opts.pocketOpts, bodySts, stsPerCm, rowsPerCm, gauge.method) : '';
 
-  const cardiganBlock = isCardigan ? renderCardiganBand(frontSts, straightRows+hemRows, opts.buttons, gauge.method, stsPerCm, opts.cardiganClosure, opts.cardiganFrontShape, opts.cardiganBandStyle, opts.cardiganOverlap, rowsPerCm, ribHeightCm) : '';
+  const cardiganBlock = isCardigan ? renderCardiganBand(frontSts, straightRows+hemRows+(nk.shape==='v' ? 0 : Math.max(0, armholeRows-neckDepthRows)), opts.buttons, gauge.method, stsPerCm, opts.cardiganClosure, opts.cardiganFrontShape, opts.cardiganBandStyle, opts.cardiganOverlap, rowsPerCm, ribHeightCm) : '';
 
   const totalBodyRows = hemRows+straightRows+armholeRows;
   const yardageMeters = estimateYardage(gauge, bodySts, totalBodyRows, opts.sleeve, opts.sleeveLengthOverride, m, stsPerCm, rowsPerCm);
@@ -989,6 +989,17 @@ function computeSilhouettePlan(plan, bustSts, silhouette, rows, hemStsTarget, st
   return {hemSts: bustSts};
 }
 
+// Raglan: Back, Front and both sleeves decrease over the SAME rows (the armhole depth), so the four
+// raglan edges seam together row for row, and each piece ends at its share of the neck.
+// (Previously the body decreased "half the panel minus 40% of the neck" over 1.3 × the armhole —
+// leaving only a couple of stitches and making the body longer than the length asked for — and the
+// sleeves got a set-in cap that couldn't be sewn to a raglan edge.)
+function raglanNumbers(panelSts, underarmBindOff, neckSts, armholeRows){
+  let top = Math.max(2, neckSts);
+  if((panelSts - 2*underarmBindOff - top) % 2) top++;
+  return {rows: Math.max(2, armholeRows), top, events: Math.max(0, (panelSts - 2*underarmBindOff - top)/2)};
+}
+function raglanSleeveTop(neckSts){ return Math.max(2, toEven(neckSts*0.25)); }
 function renderConstruction(type, method, underarmBindOff, shapingSts, armholeRows, shoulderSts, neckSts, frontSts, backNeckDepthRows){
   if(type==='setin'){
     const strapRows = Math.max(0, backNeckDepthRows - 2);
@@ -999,9 +1010,9 @@ function renderConstruction(type, method, underarmBindOff, shapingSts, armholeRo
     return `<p>Shape armholes: bind off <span class="count">${underarmBindOff} sts</span> at the beginning of the next 2 rows (that's ${underarmBindOff} sts from each edge — one row shapes the right underarm, the next shapes the left), then ${dec.text}. Work straight for ${straightRowsAfter} more rows.</p>`;
   }
   if(type==='raglan'){
-    const raglanRows = Math.round(armholeRows*1.3);
-    const dec = distribute(Math.round(frontSts*0.5 - neckSts*0.4), raglanRows, 'decrease');
-    return `<p>Shape the raglan: bind off <span class="count">${underarmBindOff} sts</span> at the beginning of the next 2 rows (${underarmBindOff} sts from each underarm edge) to start the raglan line, then over the next <span class="count">${raglanRows} rows</span>, ${dec.text}, working the decrease one stitch in from each raglan edge, until the neck edge is reached. The sleeves are shaped with matching raglan decreases on both edges over the same number of rows, and all four pieces (back, 2 fronts or front, 2 sleeves) are typically joined and finished together at the neckband.</p>`;
+    const rg = raglanNumbers(frontSts, underarmBindOff, neckSts, armholeRows);
+    const dec = distribute(rg.events, rg.rows, 'decrease');
+    return `<p>Shape the raglan: bind off <span class="count">${underarmBindOff} sts</span> at the beginning of the next 2 rows (${underarmBindOff} sts from each underarm edge) to start the raglan line, then over the next <span class="count">${rg.rows} rows</span>, ${dec.text}, working each decrease one stitch in from the edge, until <span class="count">${rg.top} sts</span> remain. Place them on a holder for the neckband. The sleeves are decreased over the same ${rg.rows} rows, so all four raglan edges sew together row for row.</p>`;
   }
   if(type==='saddle'){
     const shapeRows = Math.round(armholeRows*0.55);
@@ -1429,8 +1440,12 @@ function sleeveSegText(seg, method, inRound){
 }
 const FLARE_NOTE = `<div class="note" style="margin-top:6px;">For a true bell: the sleeve stays close to the arm at the top and only widens below, ending well wider than the upper arm, with an edge that doesn't draw in. If your bell comes out puffy instead, check the cuff edge isn't ribbed and that the bind-off is loose — a tight bind-off gathers the hem just like rib does.</div>`;
 
-function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, lengthOverride, hem, construction, cuffRows, direction, sleeveDropCm){
+function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, lengthOverride, hem, construction, cuffRows, direction, sleeveDropCm, raglan){
   const method = gauge.method;
+  const isRaglan = construction==='raglan' && raglan;
+  // A raglan sleeve has no armhole to pick up from, so it is always worked from the cuff up.
+  const raglanTopDownNote = isRaglan && direction==='shoulderToCuff' ? `<div class="note" style="margin-top:6px;">Raglan sleeves are worked from the cuff up here (there's no armhole to pick up from — the sleeve top is part of the raglan seam).</div>` : '';
+  if(isRaglan) direction = 'cuffToShoulder';
   const lenCm = lengthOverride ? Math.max(0.5, lengthOverride - (sleeveDropCm||0)) : m.armholeDepth*0.15; // only 'cap' reaches here without an override; cap sleeves are too short for drop compensation to apply
   const sleeveLenRows = Math.max(2, Math.round(lenCm*rowsPerCm));
   const isDropShoulder = construction==='square';
@@ -1462,7 +1477,7 @@ function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, le
     } else if(kind==='balloon'){
       const midSts = toEven(capSts*1.4); // genuinely puffy, not just a subtle 15% wider
       const upRows = Math.round(sleeveLenRows*0.25);
-      const downRows = Math.round(sleeveLenRows*0.6);
+      const downRows = Math.max(1, sleeveLenRows - upRows - (hem==='rib' ? cuffRows : 0)); // the whole rest of the sleeve (it used to stop at 85%)
       const incToMid = distribute((midSts-capSts)/2, upRows, 'increase');
       const decToCuff = distribute((midSts-cuffSts)/2, downRows, 'decrease');
       tdBody = `<p>${pickupWord} <span class="count">${capSts} sts</span> evenly around the armhole opening.</p>
@@ -1523,6 +1538,12 @@ function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, le
 
   const capBindOffFor = (widthSts) => toEven(widthSts*0.08);
   const capTextFor = (widthSts) => {
+    if(isRaglan){
+      const top = raglanSleeveTop(raglan.neckSts);
+      const rg = raglanNumbers(widthSts, raglan.ub, top, armholeRows);
+      const dec = distribute(rg.events, rg.rows, 'decrease');
+      return `Shape the raglan top to match the body: bind off <span class="count">${raglan.ub} sts</span> at the beginning of the next 2 rows, then over the next <span class="count">${rg.rows} rows</span>, ${dec.text}, until <span class="count">${rg.top} sts</span> remain. Place them on a holder for the neckband — each raglan edge sews to the matching Back or Front raglan edge, row for row.`;
+    }
     const bindOff = capBindOffFor(widthSts);
     const shapeSts = Math.max(1, Math.round((widthSts - bindOff*2)*0.55/2)); // decreases per side
     const dec = distribute(shapeSts, Math.round(armholeRows*0.7), 'decrease');
@@ -1538,8 +1559,9 @@ function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, le
     body = `<p>${castOnWord} <span class="count">${capSts} sts</span>. Work straight for ${sleeveLenRows} rows total with little or no shaping — this sleeve is essentially a short, straight-sided cap rather than a fitted sleeve. Bind off, or shape a very shallow curve over the last couple of rows if you want a slight cap.</p>`;
   } else if(kind==='balloon'){
     const midSts = toEven(capSts*1.4); // genuinely puffy, not just a subtle 15% wider
-    const incToMid = distribute((midSts-cuffSts)/2, Math.round(sleeveLenRows*0.6), 'increase');
-    const decToCap = distribute((midSts-capSts)/2, Math.round(sleeveLenRows*0.25), 'decrease');
+    const decRowsB = Math.round(sleeveLenRows*0.25);
+    const incToMid = distribute((midSts-cuffSts)/2, Math.max(1, sleeveLenRows - decRowsB - (hem==='rib' ? cuffRows : 0)), 'increase');
+    const decToCap = distribute((midSts-capSts)/2, decRowsB, 'decrease');
     body = `<p>${castOnWord} <span class="count">${cuffSts} sts</span>${hem==='rib'?` and work a rib cuff for ${cuffRows} rows.`:'.'} ${methodPhrase(method,'Increase generously: '+incToMid.text)} until <span class="count">${midSts} sts</span> are on the needle (this is the balloon's fullest point).</p>
     <p>Then ${methodPhrase(method,'shape back down: '+decToCap.text)} to <span class="count">${capSts} sts</span> to gather the balloon back in before the armhole. ${capText}</p>`;
   } else if(kind==='bishop'){
@@ -1591,7 +1613,7 @@ function renderSleeve(kind, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, le
     <p>${up.map(s=>sleeveSegText(s, method, false)).join(', then ')}, until <span class="count">${sh.capSts} sts</span> are on the needle at the underarm.</p>
     <p>${capText}</p>${kind==='flare'?FLARE_NOTE:''}`;
   }
-  return `<h4>Sleeves — ${kindLabel}${isDropShoulder?', flat top (drop shoulder)':''} (make 2)</h4>${body}${dropNote}`;
+  return `<h4>Sleeves — ${kindLabel}${isDropShoulder?', flat top (drop shoulder)':''}${isRaglan?', raglan top':''} (make 2)</h4>${body}${raglanTopDownNote}${dropNote}`;
 }
 
 function methodPhrase(method, handText){
@@ -1656,7 +1678,7 @@ function renderCardiganBand(frontSts, bandRows, buttonCount, method, stsPerCm, c
     return `<h4>Fronts & wrap tie</h4>
     <p>Work the Front as two separate pieces, but make them asymmetric: the piece that wraps underneath starts at the usual <span class="count">${Math.ceil(frontSts/2)} sts</span>, while the piece that wraps on top starts at <span class="count">${Math.ceil(frontSts/2)+overlapSts} sts</span> — the extra ${overlapSts} sts is what lets it cross over and overlap the underneath front at the waist. Shape armhole and neck edges as usual.</p>
     ${shapeNote}
-    <p>Knit two long i-cord or narrow rib ties (about ${Math.max(10,Math.round(stsPerCm*8))} sts wide before doing a cast-on estimate — adjust to taste) and sew one to each side seam at waist height. Cross the wider front over the narrower one and tie at the side or back to close.</p>`;
+    <p>Knit two long 3-stitch i-cord (or narrow rib) ties, each about ${(frontSts/stsPerCm).toFixed(1)}cm long (${Math.round(frontSts/stsPerCm*(rowsPerCm||stsPerCm*1.4))} rows), and sew one to each side seam at waist height. Cross the wider front over the narrower one and tie at the side or back to close.</p>`;
   }
   if(isDouble){
     const spacing = Math.max(2, Math.floor(bandRows/(buttonCount+1)));
@@ -2924,26 +2946,33 @@ function generatePonchoPattern(doll, gauge){
       bodyHtml = `<p>${castOnWord} <span class="count">${neckPickupSts} sts</span> and join for circular knitting. Over the next ${incRows} rounds, work an increase round of <span class="count">${flarePer} sts</span> spaced evenly around ${ev.text.replace(/increase 1 st at each end /g,'').replace(/ time\(s\)/g,' time(s)')} — <span class="count">${flareRounds}</span> increase rounds in all — until you reach <span class="count">${hemSts} sts</span>. This steady round-by-round increase is what makes the flare grow smoothly from the neck outward, rather than a sudden jump. Work the final ${ribRows} rounds in 1x1 rib, then bind off loosely.</p>`;
     }
   } else {
-    constructionLabel = isOpenFront ? 'Worked flat in two halves (Back and Front, split down the center) and seamed at the shoulders' : 'Worked flat as one piece, folded and seamed at the shoulders (or worked in two halves and seamed)';
-    const panelHem = isOpenFront ? Math.ceil(hemSts/2) : hemSts;
-    if(format==='rowbyrow'){
-      const p = newPlan();
-      planAdd(p, ribRows, '1x1 rib');
-      planAdd(p, Math.max(0, lengthRows-ribRows), stitchLabel);
-      bodyHtml = `<p>${castOnWord} <span class="count">${panelHem} sts</span>${isOpenFront?' (make 2: Left and Right)':''}. Work flat, back and forth.</p><div class="schematic">${renderPlan(p).join('\n')}\nleave live or bind off loosely at the neck edge for the neckband</div>`;
-    } else {
-      bodyHtml = `<p>${castOnWord} <span class="count">${panelHem} sts</span>${isOpenFront?' (make 2: Left and Right)':''}. Work flat, back and forth. Work ${Math.max(0,lengthRows-ribRows)} rows in ${stitchLabel}, then a final ${ribRows} rows in 1x1 rib at the hem. ${isOpenFront?'Leave the neck edge live or bind off loosely, ready to pick up for the neckband.':'Fold the piece in half; the fold becomes one shoulder line.'}</p>`;
-    }
+    // Two panels (Back and Front), each half the hem, sewn together at the shoulders; a split-front
+    // cape has the Front in two halves (Left and Right) that stay open at centre front.
+    constructionLabel = isOpenFront ? 'Worked flat from the hem up as a Back and two Front halves, sewn together at the shoulders and open at centre front' : 'Worked flat from the hem up as two panels (Back and Front), sewn together at the shoulders';
+    const panelSts = toEven(hemSts/2);
+    const halfFrontSts = toEven(panelSts/2);
+    const p = newPlan();
+    planAdd(p, ribRows, '1x1 rib (hem)');
+    planAdd(p, Math.max(0, lengthRows-ribRows), stitchLabel);
+    const pieceText = isOpenFront
+      ? `<b>Back:</b> ${castOnWord.toLowerCase()} <span class="count">${panelSts} sts</span>. <b>Left Front and Right Front (make 2):</b> ${castOnWord.toLowerCase()} <span class="count">${halfFrontSts} sts</span> each.`
+      : `<b>Back and Front (make 2):</b> ${castOnWord.toLowerCase()} <span class="count">${panelSts} sts</span> each.`;
+    bodyHtml = format==='rowbyrow'
+      ? `<p>${pieceText} Work flat, back and forth.</p><div class="schematic">${renderPlan(p).join('\n')}\nbind off loosely (the neckband is picked up from this edge)</div>`
+      : `<p>${pieceText} Work flat, back and forth: ${ribRows} rows of 1x1 rib for the hem, then ${Math.max(0,lengthRows-ribRows)} rows in ${stitchLabel}. Bind off loosely — the neckband is picked up from this edge.</p>`;
   }
 
   const hoodBlock = style==='hooded' ? planCollarFinish('hood', neckPickupSts, method, m, stsPerCm, rowsPerCm, hoodHeightOverride, ribHeightCm, gauge.tension, 'none') : '';
   const neckbandBlock = style!=='flared' ? renderCollarFinish('ribbed', neckPickupSts, method, m, stsPerCm, rowsPerCm, null, false, ribHeightCm, gauge.tension, isOpenFront ? 'zip' : 'none') : '';
 
+  const panelStsA = toEven(hemSts/2);
+  const neckGapSts = Math.min(panelStsA - 4, toEven(neckPickupSts/2)); // half the neck opening sits on each panel
+  const seamSts = Math.max(2, Math.round((panelStsA - neckGapSts)/2));
   const shoulderNote = style==='flared'
     ? ''
     : isOpenFront
-      ? `<h4>Assembly</h4><p>Sew the two halves together along the top (shoulder) edge only, for about ${Math.round((m.shoulderWidth||3)*stsPerCm)} sts centered at each side, leaving the rest of the top edge and all of the center front open — that opening (plus the neckline) is what makes this a wearable cape rather than a closed poncho.</p>`
-      : `<h4>Assembly</h4><p>Sew the top (shoulder) edges together, leaving a gap at the center for the head to fit through and matching the neck pickup width above.</p>`;
+      ? `<h4>Assembly</h4><p>Lay the Left and Right Fronts on the Back, outer edges matching. Sew each Front to the Back along the top edge for <span class="count">${seamSts} sts</span> from the outer edge (the shoulder), leaving the centre <span class="count">${neckGapSts} sts</span> of the Back open for the neck. The centre front stays open — that's what makes this a cape. Leave the sides open, or sew them up from the hem leaving the top third open for the arms.</p>`
+      : `<h4>Assembly</h4><p>Lay the Front on the Back. Sew them together along the top edge for <span class="count">${seamSts} sts</span> in from each outer edge (the shoulders), leaving the centre <span class="count">${neckGapSts} sts</span> open for the head. Leave the sides open, or sew them up from the hem leaving the top third open for the arms.</p>`;
 
   const styleLabel = {straight:'Straight', flared:'Flared', hooded:'Hooded', splitfront:'Split-front', capelet:'Capelet'}[style];
   drawSpec = {kind:'poncho', style, neck:neckPickupSts/stsPerCm, hem:hemSts/stsPerCm, length:lengthRows/rowsPerCm, rib:ribRows/rowsPerCm, hood: style==='hooded', stitch};
@@ -3073,7 +3102,7 @@ function generateBodysuitPattern(doll, gauge){
 
   let sleeveBlock = '';
   if(opts.sleeve!=='sleeveless'){
-    sleeveBlock = renderSleeve(opts.sleeve, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, opts.sleeveLengthOverride, 'rib', opts.construction, Math.max(2,Math.round(ribHeightCm*rowsPerCm)), opts.sleeveDirection, 0);
+    sleeveBlock = renderSleeve(opts.sleeve, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, opts.sleeveLengthOverride, 'rib', opts.construction, Math.max(2,Math.round(ribHeightCm*rowsPerCm)), opts.sleeveDirection, 0, {ub: underarmBindOff, neckSts});
   } else {
     const armholePickupSts = toEven(m.armholeDepth*2*stsPerCm*1.05);
     const armholeBandRows = Math.max(2, Math.round(ribHeightCm*rowsPerCm));
@@ -3129,13 +3158,13 @@ function generateBodysuitPattern(doll, gauge){
   }
 
   const closureNote = opts.closure==='snapcrotch'
-    ? `<p class="note" style="margin:6px 0 0;">Snap-crotch opening: instead of joining the center gusset permanently, work each side of it as a short separate strip with a sewn-on snap (or hook-and-eye) at the tip, so the crotch can be opened for dressing the doll.</p>`
-    : `<p class="note" style="margin:6px 0 0;">Pull-on construction: the center gusset is simply sewn closed — this relies on the fabric's own stretch to get the bodysuit on and off, which is usually enough at this gauge and ease.</p>`;
+    ? `<p class="note" style="margin:6px 0 0;">Snap-crotch opening: instead of sewing the crotch sections together, sew 2 small snaps (or hooks and eyes) across them, so the crotch opens for dressing the doll.</p>`
+    : `<p class="note" style="margin:6px 0 0;">Pull-on construction: the crotch sections are simply sewn closed — this relies on the fabric's own stretch to get the bodysuit on and off, which is usually enough at this gauge and ease.</p>`;
 
   drawSpec = {kind:'bodysuit', chest:bodySts/stsPerCm, hem:sil.hemSts*2/stsPerCm, torso:torsoRows/rowsPerCm, armhole:m.armholeDepth, legOpen:legPickupSts/stsPerCm,
     neck:opts.neck, collar:opts.collar, sleeve:opts.sleeve, sleeveLen:opts.sleeveLengthOverride||0, upperArm:m.upperArmCirc*(1+ease), cuff: opts.sleeve==='flare' ? flareCuffSts(m, ease, stsPerCm)/stsPerCm : (m.wristCirc||m.upperArmCirc*0.72)*(1+ease), neckCirc:m.neckCirc,
     construction:opts.construction, closure:opts.closure, stitch:opts.stitch, silhouette:opts.silhouette};
-  const crotchHtml = `<h4>Crotch &amp; leg openings</h4><p>Once Back and Front each reach <span class="count">${sil.hemSts} sts</span> at the base, bind off the center <span class="count">${crotchGussetSts} sts</span> on each piece (this is the crotch gusset). Leave the remaining <span class="count">${perLegSts} sts</span> on each side of each piece live on a holder.</p><p>Sew the two side seams (underarm to leg opening) and the center gusset bind-off edges (Front to Back) closed. For each leg opening, pick up <span class="count">${legPickupSts} sts</span> evenly around the combined Front+Back edge and work 1x1 rib for ${legBandRows} rows; bind off in rib.</p>${closureNote}`;
+  const crotchHtml = `<h4>Crotch &amp; leg openings</h4><p>The cast-on edges of the Back and Front are the bottom of the bodysuit. Mark the centre <span class="count">${crotchGussetSts} sts</span> of each cast-on edge (the crotch); the <span class="count">${perLegSts} sts</span> on either side of it become the leg openings.</p><p>Sew the two side seams (underarm to the bottom edge) and sew the marked crotch sections of the Front and Back cast-on edges together. For each leg opening, pick up <span class="count">${legPickupSts} sts</span> evenly around the combined Front+Back edge and work 1x1 rib for ${legBandRows} rows; bind off in rib.</p>${closureNote}`;
 
   const html = `
   <div class="output">
@@ -3250,7 +3279,7 @@ function generateJumpsuitPattern(doll, gauge){
   const ribHeightCm = numOr(document.getElementById('b_ribHeight').value) || 1;
   const collarBlock = renderCollarFinish(opts.collar, neckPickupSts, method, m, stsPerCm, rowsPerCm, null, false, ribHeightCm, gauge.tension, 'none');
   let sleeveBlock = '';
-  if(opts.sleeve!=='sleeveless') sleeveBlock = renderSleeve(opts.sleeve, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, opts.sleeveLengthOverride, 'rib', opts.construction, Math.max(2,Math.round(ribHeightCm*rowsPerCm)), 'cuffToShoulder', 0);
+  if(opts.sleeve!=='sleeveless') sleeveBlock = renderSleeve(opts.sleeve, m, gauge, stsPerCm, rowsPerCm, ease, armholeRows, opts.sleeveLengthOverride, 'rib', opts.construction, Math.max(2,Math.round(ribHeightCm*rowsPerCm)), 'cuffToShoulder', 0, {ub: underarmBindOff, neckSts});
   else { const p=toEven(m.armholeDepth*2*stsPerCm*1.05); sleeveBlock = `<h4>Armhole finish (make 2)</h4><p>Pick up <span class="count">${p} sts</span> evenly around the armhole and work 1x1 rib for ${Math.max(2,Math.round(ribHeightCm*rowsPerCm))} rows. Bind off in rib.</p>`; }
 
   const bodiceWaistInc = distribute((frontSts-waistPanelSts)/2, bodiceRows, 'increase');
@@ -4302,10 +4331,9 @@ function renderPatternRowByRow(d){
     }
     planAddOne(backPlan, `bind off all remaining sts`);
   } else if(d.opts.construction==='raglan'){
-    const raglanRows = Math.round(d.armholeRows*1.3);
-    const raglanEvents = Math.max(0, Math.round(d.frontSts*0.5 - d.neckSts*0.4));
-    planShape(backPlan, raglanEvents, raglanRows, 'dec 1 st each end (raglan line)', stitchLabel);
-    planAddOne(backPlan, `bind off remaining sts, or place on holder for the neckband join`);
+    const rg = raglanNumbers(d.frontSts, d.underarmBindOff, d.neckSts, d.armholeRows);
+    planShape(backPlan, rg.events, rg.rows, 'dec 1 st each end (raglan line)', stitchLabel);
+    planAddOne(backPlan, `place the remaining ${rg.top} sts on a holder for the neckband`);
   } else {
     const strapRows = Math.max(0, d.backNeckDepthRows - 2);
     const preNeckRows = Math.max(0, d.armholeRows - d.backNeckDepthRows - 2);
@@ -4352,15 +4380,15 @@ function renderPatternRowByRow(d){
     planAddOne(frontPlan, `bind off all remaining sts`);
     frontHtml = `<h4>Front</h4><p>${castOnWord} <span class="count">${d.sil.hemSts} sts</span>.</p><div class="schematic">${renderPlan(frontPlan).join('\n')}</div><div class="note">Identical to Back — off-shoulder pieces have no separate front neck shaping or shoulder seam.</div>`;
   } else if(d.opts.construction==='raglan'){
-    const raglanRowsF = Math.round(d.armholeRows*1.3);
-    const raglanEventsF = Math.max(0, Math.round(d.frontSts*0.5 - d.neckSts*0.4));
+    const rgF = raglanNumbers(d.frontSts, d.underarmBindOff, d.neckSts, d.armholeRows);
+    const raglanRowsF = rgF.rows, raglanEventsF = rgF.events;
     const frontPlan = newPlan();
     if(d.hemRows>0) planAdd(frontPlan, d.hemRows, hemLabel);
     computeSilhouettePlan(frontPlan, d.frontSts, d.opts.silhouette, d.straightRows, d.hipTargetSts, stitchLabel, d.dressLm);
     planAddOne(frontPlan, `bind off ${d.underarmBindOff} sts (armhole, right edge)`);
     planAddOne(frontPlan, `bind off ${d.underarmBindOff} sts (armhole, left edge)`);
     planShape(frontPlan, raglanEventsF, raglanRowsF, 'dec 1 st each end (raglan line)', stitchLabel);
-    planAddOne(frontPlan, `bind off remaining sts, or place on holder for the neckband join`);
+    planAddOne(frontPlan, `place the remaining ${rgF.top} sts on a holder for the neckband`);
     frontHtml = `<h4>Front</h4><p>${castOnWord} <span class="count">${d.sil.hemSts} sts</span>.</p><div class="schematic">${renderPlan(frontPlan).join('\n')}</div><div class="note">Raglan front is approximated the same way as the back here — real raglan patterns typically shape the front neck and raglan line together, splitting into two sides partway up. Adapt the split by eye when the piece is a few centimeters from the neckband.</div>`;
   } else if(['curved','square','v','boat','placket','slit'].includes(d.nk.shape)){
     const pf = buildPulloverFrontPlan(d, hemLabel, stitchLabel);
@@ -4379,7 +4407,10 @@ function renderPatternRowByRow(d){
   let sleeveHtml;
   const isTopDownSleeve = d.opts.sleeveDirection==='shoulderToCuff';
   const dropNoteRB = (d.opts.sleeveLengthOverride && d.sleeveDropCm>0.1) ? `<div class="note" style="margin-top:6px;">Shortened by ${d.sleeveDropCm.toFixed(1)}cm from what you entered — the extended shoulder/off-shoulder band already covers that much of the arm, so the sleeve doesn't need to cover it again.</div>` : '';
-  if(d.opts.sleeve==='sleeveless'){
+  if(d.opts.sleeve!=='sleeveless' && d.opts.construction==='raglan'){
+    // raglan sleeves need a raglan top that matches the body row for row — the narrative sleeve has it
+    sleeveHtml = `<div class="note">Raglan sleeves are written out below with their raglan top (decreased over the same ${d.armholeRows} rows as the Back and Front).</div>${d.sleeveBlock}`;
+  } else if(d.opts.sleeve==='sleeveless'){
     const armholePickupSts = toEven(d.m.armholeDepth*2*d.stsPerCm*1.05);
     const armholeBandRows = Math.max(2, Math.round((d.opts.ribHeight||0.6)*d.rowsPerCm));
     sleeveHtml = `<h4>Armhole finish (make 2, sleeveless)</h4><p>Sleeveless is its own construction here, not just "sleeve length zero" — the armhole is cut deeper than a set-in sleeve's (there's no cap to ease fabric into), and it's finished with its own neat picked-up band instead of a smooth curve for a sleeve to set into.</p><p>Pick up <span class="count">${armholePickupSts} sts</span> evenly around the armhole opening and work 1x1 rib for ${armholeBandRows} rows. Bind off in rib.</p>`;
@@ -4436,19 +4467,19 @@ function renderPatternRowByRow(d){
     const capSts = toEven(d.m.upperArmCirc*(1+d.ease)*d.stsPerCm);
     const cuffSts = toEven((d.m.wristCirc||d.m.upperArmCirc*0.65)*(1+d.ease)*d.stsPerCm);
     const midSts = toEven(capSts*1.4); // genuinely puffy, not just a subtle 15% wider
-    const cuffRows = Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm));
+    const cuffRows = d.opts.hem==='rib' ? Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm)) : 0; // rows reserved for a rib cuff only when there is one
     const sp = newPlan();
     if(isTopDownSleeve){
       const pickupWord = method==='hand' ? 'Pick up' : 'Pick up (or cast on)';
       const upRows = Math.round(sleeveLenRows*0.25);
-      const downRows = Math.round(sleeveLenRows*0.6);
+      const downRows = Math.max(1, sleeveLenRows - upRows - cuffRows);
       planShape(sp, (midSts-capSts)/2, upRows, 'inc 1 st each end', stitchLabel);
       planShape(sp, (midSts-cuffSts)/2, downRows, 'dec 1 st each end', stitchLabel);
       if(d.opts.hem==='rib') planAdd(sp, cuffRows, '1x1 rib');
       sleeveHtml = `<h4>Sleeves — balloon, full-length, shoulder to cuff${isDropShoulder?', flat top (drop shoulder)':''} (make 2)</h4><p>${pickupWord} <span class="count">${capSts} sts</span> evenly around the armhole opening.</p><div class="schematic">${renderPlan(sp).join('\n')}\nbind off</div><div class="note" style="margin-top:6px;">Increases to the balloon's fullest point first, then narrows back down to the cuff — worked top-down by picking up around the armhole.</div>${dropNoteRB}`;
     } else {
-      const upRows = Math.round(sleeveLenRows*0.6);
       const downRows = Math.round(sleeveLenRows*0.25);
+      const upRows = Math.max(1, sleeveLenRows - downRows - cuffRows);
       planShape(sp, (midSts-cuffSts)/2, upRows, 'inc 1 st each end', stitchLabel);
       planShape(sp, (midSts-capSts)/2, downRows, 'dec 1 st each end', stitchLabel);
       if(isDropShoulder){
@@ -4471,7 +4502,7 @@ function renderPatternRowByRow(d){
     const cuffBandSts = toEven((d.m.wristCirc||d.m.upperArmCirc*0.72)*(1+d.ease)*d.stsPerCm);
     const bishopFullSts = toEven(capSts*1.35);
     const elbowRatioRB = (d.m.shoulderToElbow && d.m.shoulderToWrist) ? Math.min(0.85, Math.max(0.15, d.m.shoulderToElbow/d.m.shoulderToWrist)) : 0.55;
-    const cuffRows = Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm));
+    const cuffRows = d.opts.hem==='rib' ? Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm)) : 0; // rows reserved for a rib cuff only when there is one
     const sp = newPlan();
     const elbowNoteRB = (d.m.shoulderToElbow&&d.m.shoulderToWrist) ? `Elbow point taken from this doll's own shoulder-to-elbow measurement (${Math.round(elbowRatioRB*100)}% of the sleeve).` : `No shoulder-to-elbow measurement is on file for this doll, so the elbow point defaults to 55% of the sleeve length.`;
     if(isTopDownSleeve){
@@ -4506,7 +4537,7 @@ function renderPatternRowByRow(d){
     const capSts = toEven(d.m.upperArmCirc*(1+d.ease)*d.stsPerCm);
     const cuffBandSts = toEven((d.m.wristCirc||d.m.upperArmCirc*0.72)*(1+d.ease)*d.stsPerCm);
     const puffSts = toEven(capSts*1.25);
-    const cuffRows = Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm));
+    const cuffRows = d.opts.hem==='rib' ? Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm)) : 0; // rows reserved for a rib cuff only when there is one
     const puffLenRows = Math.max(4, Math.round(d.armholeRows*0.45));
     const sp = newPlan();
     if(isTopDownSleeve){
@@ -4539,7 +4570,7 @@ function renderPatternRowByRow(d){
     const capSts = toEven(d.m.upperArmCirc*(1+d.ease)*d.stsPerCm);
     const cuffBandSts = toEven((d.m.wristCirc||d.m.upperArmCirc*0.72)*(1+d.ease)*d.stsPerCm);
     const muttonSts = toEven(capSts*1.6);
-    const cuffRows = Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm));
+    const cuffRows = d.opts.hem==='rib' ? Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm)) : 0; // rows reserved for a rib cuff only when there is one
     const sp = newPlan();
     if(isTopDownSleeve){
       const pickupWord = method==='hand' ? 'Pick up' : 'Pick up (or cast on)';
@@ -4579,7 +4610,7 @@ function renderPatternRowByRow(d){
     const elbowSts = d.m.elbowCirc ? toEven(d.m.elbowCirc*(1+d.ease)*d.stsPerCm) : cuffBandSts;
     const forearmPuffSts = toEven(elbowSts*1.45);
     const elbowRatioRB = (d.m.shoulderToElbow && d.m.shoulderToWrist) ? Math.min(0.85, Math.max(0.15, d.m.shoulderToElbow/d.m.shoulderToWrist)) : 0.55;
-    const cuffRows = Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm));
+    const cuffRows = d.opts.hem==='rib' ? Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm)) : 0; // rows reserved for a rib cuff only when there is one
     const elbowNoteRB = (d.m.shoulderToElbow&&d.m.shoulderToWrist) ? `Elbow point taken from this doll's own shoulder-to-elbow measurement (${Math.round(elbowRatioRB*100)}% of the sleeve).` : `No shoulder-to-elbow measurement is on file for this doll, so the elbow point defaults to 55% of the sleeve length.`;
     const sp = newPlan();
     if(isTopDownSleeve){
@@ -4618,7 +4649,7 @@ function renderPatternRowByRow(d){
     const capSts = toEven(d.m.upperArmCirc*(1+d.ease)*d.stsPerCm);
     const cuffBandSts = toEven((d.m.wristCirc||d.m.upperArmCirc*0.72)*(1+d.ease)*d.stsPerCm);
     const lanternSts = toEven(capSts*1.35);
-    const cuffRows = Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm));
+    const cuffRows = d.opts.hem==='rib' ? Math.max(2, Math.round((d.opts.ribHeight||1)*d.rowsPerCm)) : 0; // rows reserved for a rib cuff only when there is one
     const midRows = Math.max(2, Math.round(sleeveLenRows*0.5));
     const sp = newPlan();
     if(isTopDownSleeve){
@@ -4698,7 +4729,7 @@ Fit: ${d.opts.fit} · Stitch: ${stitchLabel}</div>
       ${d.pocketBlock}
 
       <h4>Finishing</h4>
-      <p>Sew or graft shoulder seams${cardiRB&&cardiRB.neckHandled?' (before picking up the band)':''}. ${d.opts.sleeve!=='sleeveless' ? (isTopDownSleeve ? 'The sleeves are picked up after the shoulder seams; then sew sleeve and side seams in one pass, matching the underarm bind-offs.' : 'Set sleeves into armholes, matching underarm bind-offs, and sew sleeve and side seams in one pass.') : ''} ${d.isCardigan ? 'Sew on buttons to match the buttonholes.' : ''} ${d.opts.pocket ? 'Sew the pocket(s) in place.' : ''} Weave in ends and block lightly to the schematic measurements above.</p>
+      <p>${d.opts.construction==='raglan' ? 'Sew the four raglan seams (each sleeve\x27s raglan edges to the Back and Front, row for row), then sew sleeve and side seams in one pass.' : `Sew or graft shoulder seams${cardiRB&&cardiRB.neckHandled?' (before picking up the band)':''}.`} ${d.opts.sleeve!=='sleeveless' && d.opts.construction!=='raglan' ? (isTopDownSleeve ? 'The sleeves are picked up after the shoulder seams; then sew sleeve and side seams in one pass, matching the underarm bind-offs.' : 'Set sleeves into armholes, matching underarm bind-offs, and sew sleeve and side seams in one pass.') : ''} ${d.isCardigan ? 'Sew on buttons to match the buttonholes.' : ''} ${d.opts.pocket ? 'Sew the pocket(s) in place.' : ''} Weave in ends and block lightly to the schematic measurements above.</p>
 
       <div class="note">Row-by-row format: each line is R(row number): action. A range like "R6-27" means work every one of those rows the same way. This is generated with the same proportional math as the narrative format — the two should always agree on totals.</div>
       ${method==='machine' ? '<div class="note">Machine phrasing describes shaping technique (full-fashion transfers, e-wrap increases) rather than a full Sintral program.</div>' : ''}
@@ -4757,7 +4788,7 @@ Fit: ${d.opts.fit} · Stitch: ${stitchLabel}</div>
       ${d.sleeveBlock || '<h4>Sleeves</h4><p>Sleeveless — leave armholes as bound off. Optionally pick up sts around the armhole and work 3–4 rows of rib or garter to finish the edge.</p>'}
 
       <h4>Finishing</h4>
-      <p>Sew or graft shoulder seams. ${d.opts.sleeve!=='sleeveless' ? 'Set sleeves into armholes, matching underarm bind-offs, and sew sleeve and side seams in one pass.' : ''} ${d.isCardigan ? 'Sew on buttons to match the buttonholes.' : ''} ${d.opts.pocket ? 'Sew the pocket(s) in place.' : ''} Weave in ends and block lightly to the schematic measurements above.</p>
+      <p>${d.opts.construction==='raglan' ? 'Sew the four raglan seams (each sleeve\x27s raglan edges to the Back and Front, row for row), then sew sleeve and side seams in one pass, matching the underarm bind-offs.' : `Sew or graft shoulder seams. ${d.opts.sleeve!=='sleeveless' ? 'Set sleeves into armholes, matching underarm bind-offs, and sew sleeve and side seams in one pass.' : ''}`} ${d.isCardigan ? 'Sew on buttons to match the buttonholes.' : ''} ${d.opts.pocket ? 'Sew the pocket(s) in place.' : ''} Weave in ends and block lightly to the schematic measurements above.</p>
 
       <div class="note">This is a proportional draft, generated from ${esc(d.doll.name)}'s measurements and the selected gauge — the same method real pattern-drafting software uses (percentage shaping distributed evenly across rows). Knit a swatch and check your row gauge before committing to a full piece.</div>
       ${method==='machine' ? '<div class="note">Machine phrasing describes shaping technique (full-fashion transfers, e-wrap increases) rather than a full Sintral program — treat it as your row-by-row worksheet for the carriage.</div>' : ''}

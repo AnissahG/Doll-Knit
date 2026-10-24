@@ -87,10 +87,19 @@ function reset(garment, dollId, gaugeId) {
   E('toggleGarmentFields(); updateCollarOptions(); togglePocketFields(); toggleSleeveLengthFields();');
 }
 
+
+// Record shaping calls with a negative or half-stitch amount: the engine would silently round them away.
+E(String.raw`(function(){
+  window.__bad = [];
+  const where = () => (new Error().stack.split("\n")[3] || "").replace(/^\s*at\s*/, "").replace(/\(?[a-z]+:[^)]*?(\d+):\d+\)?$/, "@$1");
+  const od = distribute; distribute = function(t, r, v){ if(t < 0 || Math.abs(t - Math.round(t)) > 1e-9) __bad.push("distribute(" + t + ", " + r + ", " + v + ") " + where()); return od(t, r, v); };
+  const ops = planShape; planShape = function(p, e, tr, a, fa){ if(e < 0 || Math.abs(e - Math.round(e)) > 1e-9) __bad.push("planShape(" + e + ", " + tr + ", " + a + ") " + where()); return ops(p, e, tr, a, fa); };
+})()`);
 const seen = new Set();
 let runs = 0;
 function generate(label) {
   const before = errors.length;
+  E('__bad = []');
   try { E('lastGenerated = null; generatePattern();'); } catch (e) { problems.push(`${label}: EXCEPTION ${e.stack || e}`); return; }
   runs++;
   if (errors.length > before) { problems.push(`${label}: ERROR ${errors.slice(before).join(' | ')}`); return; }
@@ -112,6 +121,13 @@ function generate(label) {
       if (!seen.has(key)) { seen.add(key); problems.push(`${label}: ${what} … ${text.slice(Math.max(0, m.index - 90), m.index + 50).replace(/\s+/g, ' ')}`); }
     }
   }
+  for (const b of E('__bad')) { const key = 'bad' + b.replace(/\(.*?\)/, ''); if (!seen.has(key)) { seen.add(key); problems.push(`${label}: ROUNDED SHAPING ${b}`); } }
+  for (const m of text.matchAll(/(increase|decrease)[^.]{0,40}?from (\d+) sts? to (\d+) sts?/gi)) {
+    const [, verb, a, b] = m; const wrong = verb.toLowerCase() === 'increase' ? +b < +a : +b > +a;
+    if (wrong || +a === +b) { const key = 'dir' + label.split('/')[0] + m[0].replace(/\d+/g, '#'); if (!seen.has(key)) { seen.add(key); problems.push(`${label}: WRONG DIRECTION … ${m[0]}`); } }
+  }
+  const shoulders = [...text.matchAll(/bind off (\d+) sts \(right shoulder\); bind off (\d+) sts \(left shoulder\)/g)].flatMap(m => [+m[1], +m[2]]);
+  if (shoulders.length > 2 && new Set(shoulders).size > 1) { const key = 'sh' + label.split(' :: ')[0]; if (!seen.has(key)) { seen.add(key); problems.push(`${label}: SHOULDERS DON'T MATCH ${shoulders.join('/')}`); } }
   if (!E('lastGenerated')) problems.push(`${label}: no lastGenerated`);
   const svg = out.querySelector('.techdraw svg');
   if (!svg) { if (!process.env.NODRAW) problems.push(`${label}: no technical drawing`); }
@@ -153,6 +169,31 @@ for (let i = 0; i < (QUICK ? 150 : 1500); i++) {
   for (let pass = 0; pass < 2; pass++) for (const el of controls()) { const o = optionsOf(el); const v = o[rnd(o.length)]; setCtl(el, v); if (pass) picks.push(`${el.id}=${v}`); }
   generate(`${g}/${ga}/${d} :: random#${i} ${picks.join(',')}`);
 }
+
+// "Duplicate & tweak" must restore every setting: regenerate from the saved options and compare.
+const contentText = () => (byId('patternContent')?.textContent || '').replace(/\s+/g, ' ');
+const restoreFails = new Map(); let compared = 0;
+for (let i = 0; i < (QUICK ? 120 : 600); i++) {
+  const g = garments[rnd(garments.length)], d = dollIds[rnd(2)], ga = gaugeIds[rnd(3)];
+  reset(g, d, ga);
+  for (let pass = 0; pass < 2; pass++) for (const el of controls()) { const o = optionsOf(el); setCtl(el, o[rnd(o.length)]); }
+  alerts = [];
+  E('lastGenerated = null; generatePattern();');
+  if (alerts.length || !E('lastGenerated')) continue;
+  const before = contentText();
+  E(`savedPatterns = [{id:'rt', label:'rt', html:'', dollId:lastGenerated.doll.id, gaugeId:lastGenerated.gauge.id, opts:lastGenerated.opts, adjustments:{lengthDeltaCm:0, sleeveLengthDeltaCm:0}}];`);
+  reset(garments[(garments.indexOf(g) + 1) % garments.length], d, ga);
+  E(`loadPatternIntoBuilder('rt'); lastGenerated = null; generatePattern();`);
+  const after = contentText(); compared++;
+  if (after !== before) {
+    let k = 0; while (k < before.length && before[k] === after[k]) k++;
+    const key = g + ':' + before.slice(Math.max(0, k - 30), k).replace(/\d+/g, '#');
+    if (!restoreFails.has(key)) restoreFails.set(key, `${g}/${d}/${ga}: DUPLICATE & TWEAK CHANGED THE PATTERN … was "${before.slice(Math.max(0, k - 60), k + 50)}" now "${after.slice(Math.max(0, k - 60), k + 50)}"`);
+  }
+}
+problems.push(...restoreFails.values());
+E('savedPatterns = []');
+console.log(`duplicate & tweak round trips compared: ${compared}`);
 
 // saved pattern round trip: save, view, duplicate & tweak
 reset('pullover', 'doll_full', 'g_hand'); generate('save-test');

@@ -23,8 +23,9 @@ async function loadAll(){
   customGrades = await safeGet("bjd-custom-grades", []);
   renderDolls(); renderGauges(); renderSaved(); renderCollections(); renderCustomGrades(); refreshBuilderSelects();
 }
-// Everything is stored on this device only, in IndexedDB (no size cap worth worrying about, unlike
-// the ~5 MB localStorage the first version used). Nothing is ever sent anywhere.
+// Everything is stored on this device in IndexedDB (no size cap worth worrying about, unlike the
+// ~5 MB localStorage the first version used). With ☁ Sync turned on, changes also go to the user's
+// own Supabase project (sync.js); otherwise nothing is ever sent anywhere.
 async function safeGet(key, fallback){
   try{
     const v = await Store.get(key);
@@ -33,6 +34,7 @@ async function safeGet(key, fallback){
 }
 async function safeSet(key, value){
   try{
+    syncTrackList(key, value);
     await Store.set(key, value);
     return true;
   }catch(e){ console.error("storage error", e); toast("Could not save to this device’s storage: "+(e && e.message || e), 5000); return false; }
@@ -5604,6 +5606,7 @@ async function initApp(){
   renderGradeRows();
   try { await migrateLegacyStorage(); } catch(e){ console.warn("migration failed", e); }
   await loadAll();
+  syncSnapAll(); Sync.start();
   try { if(navigator.storage?.persist && !(await navigator.storage.persisted())) navigator.storage.persist(); } catch(e){}
   if(isNative()){
     // Android back button: close the top dialog first, then go back to Dolls, then leave the app.

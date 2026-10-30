@@ -47,9 +47,16 @@ const Store = (() => {
     set: (key, value) => run('kv', 'readwrite', s => s.put(value, key)),
     photoAll: () => run('photos', 'readonly', s => s.getAll()),
     photoGet: id => run('photos', 'readonly', s => s.get(id)),
-    photoPut: rec => run('photos', 'readwrite', s => s.put(rec)),
-    photoDel: id => run('photos', 'readwrite', s => s.delete(id)),
-    photoClear: () => run('photos', 'readwrite', s => s.clear()),
+    // photoPut/photoDel/photoClear also queue the change for sync; the Raw ones are for sync itself
+    photoPut: rec => run('photos', 'readwrite', s => s.put(Sync.stamp('photos', rec))),
+    photoDel: id => { Sync.removed('photos', id); return run('photos', 'readwrite', s => s.delete(id)); },
+    photoClear: async () => {
+      for (const id of await run('photos', 'readonly', s => s.getAllKeys())) Sync.removed('photos', id);
+      return run('photos', 'readwrite', s => s.clear());
+    },
+    photoPutRaw: rec => run('photos', 'readwrite', s => s.put(rec)),
+    photoDelRaw: id => run('photos', 'readwrite', s => s.delete(id)),
+    photoClearRaw: () => run('photos', 'readwrite', s => s.clear()),
   };
 })();
 
@@ -106,10 +113,10 @@ const Photos = (() => {
     urlCache.set(key, u);
     return u;
   }
-  async function remove(id) {
+  async function remove(id, raw) {
     if (!id) return;
     for (const k of [id + ':t', id + ':f']) if (urlCache.has(k)) { URL.revokeObjectURL(urlCache.get(k)); urlCache.delete(k); }
-    await Store.photoDel(id);
+    await (raw ? Store.photoDelRaw(id) : Store.photoDel(id));
   }
   function forget() { for (const u of urlCache.values()) URL.revokeObjectURL(u); urlCache.clear(); }
   // Fill every <img data-photo="id"> inside root once its blob URL is ready.

@@ -24,6 +24,7 @@
       <h1>Doll knit Pattern Studio</h1>
       <p>Doll measurements, gauge library and instant graded patterns for hand and machine knitting.</p>
     </div>
+    <button class="icon-btn" id="syncBtn" aria-label="Sync between devices" title="☁ Sync between devices" onclick="Sync.open()" style="position:relative">☁<i class="dsync-dot" style="position:absolute;right:6px;bottom:6px"></i></button>
     <button class="icon-btn" id="settingsBtn" aria-label="Backup and settings" title="Backup and settings" onclick="openSettings()">⚙</button>
   </header>
 
@@ -695,10 +696,12 @@
   </div>
 </div>
 
+<script src="js/sync.js"></script>
 <script src="js/platform.js"></script>
 <script src="js/backup.js"></script>
 <script src="js/drawing.js"></script>
 <script src="js/dolls.js"></script>
+<script src="js/sync-wire.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

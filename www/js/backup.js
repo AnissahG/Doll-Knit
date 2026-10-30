@@ -12,7 +12,7 @@ function backupReminderHtml() {
   const days = last ? Math.floor((Date.now() - last) / 86400000) : null;
   if (days !== null && days < 14) return '';
   return `<div class="note" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-    <span style="flex:1;min-width:200px">${days === null ? 'You haven\'t made a backup yet.' : `Your last backup was ${days} days ago.`} Everything lives only on this device — a backup file keeps it safe if the tablet is reset or replaced.</span>
+    <span style="flex:1;min-width:200px">${days === null ? 'You haven\'t made a backup yet.' : `Your last backup was ${days} days ago.`} ${Sync.on ? 'Sync keeps a copy in your cloud; a backup file is a second copy you control.' : 'Everything lives only on this device — a backup file keeps it safe if the tablet is reset or replaced.'}</span>
     <button class="btn small" id="backupNow">⬇ Back up now</button></div>`;
 }
 
@@ -112,10 +112,14 @@ function openSettings() {
     <p class="help">One file with everything — dolls (with photos), gauges, saved patterns, collections and custom grades. Any size works. ${last ? 'Last backup: ' + new Date(last).toLocaleDateString() + '.' : 'No backup made on this device yet.'}</p>
     <div class="btn-row"><button class="btn" id="set_backup">⬇ Back up everything</button><button class="btn secondary" id="set_restore">⬆ Restore from backup</button></div>
     <p class="help" style="margin-top:8px">Restore replaces what is in the app with the backup's contents. Backups from the first (browser) version of this app work too — that's how you move your data into the Android app.</p>
+    <div class="section-label">Sync between devices</div>
+    <p class="help">Keeps your tablet, phone and computer showing the same dolls, gauges, patterns and photos, through the Supabase project you set up for Dollheimr Studio. Now: <b id="set_sync">${esc(($('#syncBtn')?.title || '').replace('☁ ', ''))}</b></p>
+    <div class="btn-row"><button class="btn secondary" id="set_syncOpen">☁ Sync settings</button></div>
     <div class="section-label">Storage</div>
     <p class="help" id="set_storage">Checking…</p>
     <div class="section-label">About</div>
-    <p class="help">Doll knit Pattern Studio · v1.1 · personal use. All pattern maths runs on this device; nothing is sent anywhere. Sibling of Doll crochet Pattern Studio — dolls move between the apps with Import / Export on the Dolls tab.</p>`);
+    <p class="help">Doll knit Pattern Studio · v1.2 · personal use. All pattern maths runs on this device; nothing is sent anywhere unless you turn on ☁ Sync. Sibling of Doll crochet Pattern Studio — dolls move between the apps with Import / Export on the Dolls tab.</p>`);
+  $('#set_syncOpen', el).onclick = () => { Modal.close(); Sync.open(); };
   $('#set_backup', el).onclick = () => { Modal.close(); backupAllData(); };
   $('#set_restore', el).onclick = async () => { const f = await pickFile('.json,application/json'); if (f && await restoreAllData(f)) Modal.close(); };
   (async () => {
